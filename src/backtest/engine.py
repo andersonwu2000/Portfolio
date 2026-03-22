@@ -170,15 +170,23 @@ class BacktestEngine:
         return result
 
     def _load_data(self, config: BacktestConfig) -> HistoricalFeed:
-        """從 Yahoo Finance 下載數據並載入 HistoricalFeed。"""
+        """從 Yahoo Finance 下載數據並載入 HistoricalFeed。
+
+        額外前拉 400 個交易日（約 18 個月），確保策略有足夠的回溯數據計算因子。
+        """
+        warmup_days = 400
+        warmup_start = (
+            pd.Timestamp(config.start) - pd.tseries.offsets.BDay(warmup_days)
+        ).strftime("%Y-%m-%d")
+
         yahoo = YahooFeed(config.universe)
         feed = HistoricalFeed()
 
         for symbol in config.universe:
-            df = yahoo.get_bars(symbol, start=config.start, end=config.end)
+            df = yahoo.get_bars(symbol, start=warmup_start, end=config.end)
             if not df.empty:
                 feed.load(symbol, df)
-                logger.info("Loaded %d bars for %s", len(df), symbol)
+                logger.info("Loaded %d bars for %s (warmup from %s)", len(df), symbol, warmup_start)
             else:
                 logger.warning("No data for %s, skipping", symbol)
 
