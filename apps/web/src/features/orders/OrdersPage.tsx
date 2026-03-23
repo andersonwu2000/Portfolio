@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import { useApi, useWs } from "@core/hooks";
 import { fmtCurrency, fmtDate, fmtTime } from "@core/utils";
 import { StatusBadge, ErrorAlert, TableSkeleton } from "@shared/ui";
@@ -17,23 +17,32 @@ export function OrdersPage() {
     [filter],
   );
 
+  // Debounce WS-triggered refresh to at most once per second
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useWs(
     "orders",
     useCallback(
       (msg: unknown) => {
-        if (msg && typeof msg === "object") refresh();
+        if (msg && typeof msg === "object") {
+          if (!refreshTimer.current) {
+            refreshTimer.current = setTimeout(() => {
+              refreshTimer.current = null;
+              refresh();
+            }, 1000);
+          }
+        }
       },
       [refresh],
     ),
   );
 
-  const filterLabels: Record<string, string> = {
+  const filterLabels = useMemo<Record<string, string>>(() => ({
     all: t.orders.all,
     filled: t.orders.filled,
     pending: t.orders.pending,
     cancelled: t.orders.cancelled,
     rejected: t.orders.rejected,
-  };
+  }), [t]);
 
   return (
     <div className="space-y-6">

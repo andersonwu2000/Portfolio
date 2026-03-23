@@ -9,7 +9,7 @@ import { useT } from "@core/i18n";
 
 export function Sidebar({ onLogout }: { onLogout?: () => void }) {
   const { t } = useT();
-  const [collapsed, setCollapsed] = useState(() => window.innerWidth < 768);
+  const [collapsed, setCollapsed] = useState(() => window.matchMedia("(max-width: 767px)").matches);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");

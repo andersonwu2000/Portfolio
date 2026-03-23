@@ -21,7 +21,12 @@ function loadHistory(): BacktestHistoryEntry[] {
 }
 
 function saveHistory(entries: BacktestHistoryEntry[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries.slice(0, MAX_ENTRIES)));
+  // Strip nav_series before storing to avoid localStorage bloat (5MB limit)
+  const lite = entries.slice(0, MAX_ENTRIES).map((e) => ({
+    ...e,
+    result: { ...e.result, nav_series: undefined },
+  }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(lite));
 }
 
 export function useBacktestHistory() {

@@ -55,7 +55,7 @@ export function DataTable<T>({
     setPage(0);
   };
 
-  const SortIcon = ({ col }: { col: string }) => {
+  const sortIcon = (col: string) => {
     if (sortKey !== col)
       return <ChevronsUpDown size={12} className="text-slate-600" />;
     return sortDir === "asc" ? (
@@ -84,7 +84,7 @@ export function DataTable<T>({
               >
                 <span className="inline-flex items-center gap-1">
                   {col.label}
-                  {col.sortValue && <SortIcon col={col.key} />}
+                  {col.sortValue && sortIcon(col.key)}
                 </span>
               </th>
             ))}

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { MetricCard } from "@shared/ui";
 import { fmtPct, fmtNum, fmtCurrency } from "@core/utils";
 import { useT } from "@core/i18n";
@@ -7,7 +7,7 @@ import type { BacktestRequest, StrategyInfo } from "@quant/shared";
 import { useBacktest } from "./hooks/useBacktest";
 import { useBacktestHistory } from "./hooks/useBacktestHistory";
 import type { BacktestHistoryEntry } from "./hooks/useBacktestHistory";
-import { strategiesApi } from "./api";
+import { strategiesApi } from "@feat/strategies/api";
 import { AnimatedSelect } from "./components/AnimatedSelect";
 import { ResultChart } from "./components/ResultChart";
 import { ParamsEditor } from "./components/ParamsEditor";
@@ -34,14 +34,11 @@ export function BacktestPage() {
   const { history, addEntry, removeEntry, clearHistory } = useBacktestHistory();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // Dynamic strategy list from API
   const { data: strategies } = useApi<StrategyInfo[]>(() => strategiesApi.list());
-  const strategyOptions = (strategies || []).map((s) => ({ value: s.name, label: s.name }));
-
-  // Fallback if API hasn't loaded yet
-  const effectiveStrategyOptions = strategyOptions.length > 0
-    ? strategyOptions
-    : [{ value: "momentum", label: "momentum" }];
+  const effectiveStrategyOptions = useMemo(() => {
+    const opts = (strategies || []).map((s) => ({ value: s.name, label: s.name }));
+    return opts.length > 0 ? opts : [{ value: "momentum", label: "momentum" }];
+  }, [strategies]);
 
   const set = (key: keyof BacktestRequest, val: unknown) =>
     setForm((f) => ({ ...f, [key]: val }));
@@ -91,7 +88,10 @@ export function BacktestPage() {
     });
   }, [removeEntry]);
 
-  const compareEntries = history.filter((e) => selectedIds.has(e.id));
+  const compareEntries = useMemo(
+    () => history.filter((e) => selectedIds.has(e.id)),
+    [history, selectedIds],
+  );
 
   const rebalanceOptions = [
     { value: "daily", label: t.backtest.daily },

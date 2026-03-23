@@ -25,14 +25,12 @@ export function HistoryPanel({ history, onSelect, onRemove, onClear, selectedIds
       >
         <span>History ({history.length})</span>
         <div className="flex items-center gap-2">
-          {history.length > 0 && (
-            <span
-              onClick={(e) => { e.stopPropagation(); onClear(); }}
-              className="text-xs text-slate-500 hover:text-red-400 transition-colors cursor-pointer"
-            >
-              Clear all
-            </span>
-          )}
+          <span
+            onClick={(e) => { e.stopPropagation(); onClear(); }}
+            className="text-xs text-slate-500 hover:text-red-400 transition-colors cursor-pointer"
+          >
+            Clear all
+          </span>
           {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </div>
       </button>
