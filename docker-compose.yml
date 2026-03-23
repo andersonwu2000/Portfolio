@@ -1,0 +1,42 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      QUANT_ENV: prod
+      QUANT_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/quant
+      QUANT_API_KEY: ${QUANT_API_KEY:?Set QUANT_API_KEY}
+      QUANT_JWT_SECRET: ${QUANT_JWT_SECRET:?Set QUANT_JWT_SECRET}
+      QUANT_ALLOWED_ORIGINS: ${QUANT_ALLOWED_ORIGINS:-http://localhost:3000}
+      QUANT_LOG_FORMAT: json
+      QUANT_API_WORKERS: ${QUANT_API_WORKERS:-2}
+    command: >
+      uvicorn src.api.app:app
+      --host 0.0.0.0
+      --port 8000
+      --workers ${QUANT_API_WORKERS:-2}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - cache_data:/app/.cache/market_data
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: quant
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  pg_data:
+  cache_data:

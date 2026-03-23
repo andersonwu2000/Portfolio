@@ -14,6 +14,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
+from typing import Callable
 
 import pandas as pd
 
@@ -54,13 +55,25 @@ class BacktestEngine:
     歷史數據 → 逐 bar 前進 → 策略計算信號 → 風控檢查 → 模擬撮合 → 更新持倉
     """
 
-    def run(self, strategy: Strategy, config: BacktestConfig) -> BacktestResult:
+    def run(
+        self,
+        strategy: Strategy,
+        config: BacktestConfig,
+        progress_callback: Callable[[int, int], None] | None = None,
+    ) -> BacktestResult:
         """執行回測。"""
         run_id = uuid.uuid4().hex[:8]
         logger.info(
             "BACKTEST START [%s] strategy=%s, universe=%d symbols, %s ~ %s",
             run_id, strategy.name(), len(config.universe),
             config.start, config.end,
+        )
+
+        # 存活者偏差警告
+        logger.warning(
+            "Yahoo Finance data may exhibit survivorship bias — only currently listed "
+            "symbols are available. Consider using a point-in-time dataset for "
+            "production research."
         )
 
         # 1. 準備數據
@@ -85,7 +98,8 @@ class BacktestEngine:
         if not trading_dates:
             raise ValueError("No trading dates in range")
 
-        logger.info("Trading dates: %d days", len(trading_dates))
+        total_bars = len(trading_dates)
+        logger.info("Trading dates: %d days", total_bars)
 
         # 4. 逐 bar 模擬
         nav_history: list[dict] = []
@@ -101,8 +115,8 @@ class BacktestEngine:
             portfolio.as_of = bar_date
 
             # 記錄當日開盤 NAV
-            if not hasattr(portfolio, "_nav_sod"):
-                portfolio._nav_sod = portfolio.nav  # type: ignore[attr-defined]
+            if portfolio.nav_sod == 0:
+                portfolio.nav_sod = portfolio.nav
 
             # 判斷是否再平衡日
             if self._is_rebalance_day(bar_date, i, config.rebalance_freq):
@@ -117,12 +131,16 @@ class BacktestEngine:
                     orders = weights_to_orders(target_weights, portfolio, prices)
 
                     # 風控檢查
-                    market_state = MarketState(prices=prices, daily_volumes={})
+                    volumes = self._get_volumes(feed, config.universe, bar_date)
+                    market_state = MarketState(prices=prices, daily_volumes=volumes)
                     approved = risk_engine.check_orders(orders, portfolio, market_state)
 
-                    # 模擬成交
+                    # 模擬成交（使用真實成交量）
                     current_bars = {
-                        s: {"close": float(p), "volume": 1e8}
+                        s: {
+                            "close": float(p),
+                            "volume": float(volumes.get(s, Decimal("1e8"))),
+                        }
                         for s, p in prices.items()
                     }
                     trades = sim_broker.execute(approved, current_bars, bar_date)
@@ -146,7 +164,11 @@ class BacktestEngine:
             })
 
             # 更新次日 SOD NAV
-            portfolio._nav_sod = portfolio.nav  # type: ignore[attr-defined]
+            portfolio.nav_sod = portfolio.nav
+
+            # 回報進度
+            if progress_callback:
+                progress_callback(i + 1, total_bars)
 
         # 5. 計算績效
         nav_df = pd.DataFrame(nav_history).set_index("date")
@@ -232,7 +254,30 @@ class BacktestEngine:
             mask = df.index <= pd.Timestamp(bar_date)
             if mask.any():
                 prices[symbol] = Decimal(str(round(df.loc[mask, "close"].iloc[-1], 4)))
+            else:
+                logger.debug("No price for %s on %s, skipping", symbol, bar_date)
         return prices
+
+    def _get_volumes(
+        self,
+        feed: HistoricalFeed,
+        universe: list[str],
+        bar_date: datetime,
+    ) -> dict[str, Decimal]:
+        """取得指定日期的成交量。"""
+        volumes: dict[str, Decimal] = {}
+        for symbol in universe:
+            df = feed.get_bars(symbol)
+            if df.empty:
+                continue
+            mask = df.index <= pd.Timestamp(bar_date)
+            if mask.any() and "volume" in df.columns:
+                vol = df.loc[mask, "volume"].iloc[-1]
+                if vol > 0:
+                    volumes[symbol] = Decimal(str(int(vol)))
+        return volumes
+
+    _last_rebalance_month: int = -1
 
     def _is_rebalance_day(
         self, bar_date: datetime, idx: int, freq: str
@@ -243,5 +288,10 @@ class BacktestEngine:
         elif freq == "weekly":
             return bar_date.weekday() == 0 or idx == 0  # 週一或第一天
         elif freq == "monthly":
-            return bar_date.day <= 3 or idx == 0  # 月初前 3 天或第一天
+            # First trading day of each month (rebalance once per month)
+            month_key = bar_date.year * 100 + bar_date.month
+            if idx == 0 or month_key != self._last_rebalance_month:
+                self._last_rebalance_month = month_key
+                return True
+            return False
         return True

@@ -1,96 +1,127 @@
 """
-數據存取層 — 本地 SQLite 或 PostgreSQL。
+數據存取層 — SQLAlchemy Core，支援 SQLite（開發）或 PostgreSQL（生產）。
 
-開發階段先用 SQLite，生產切 PostgreSQL + TimescaleDB。
+Tables defined here are shared with Alembic migrations via `metadata`.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pandas as pd
+import sqlalchemy as sa
+from sqlalchemy import event
 
 from src.domain.models import Trade, Side
 
+if TYPE_CHECKING:
+    from src.domain.models import RiskAlert
+
 logger = logging.getLogger(__name__)
 
-# 開發階段使用 SQLite，避免強制依賴 PostgreSQL
+# ─── Schema ───────────────────────────────────────────────
+
+metadata = sa.MetaData()
+
+bars_table = sa.Table(
+    "bars",
+    metadata,
+    sa.Column("symbol", sa.Text, nullable=False),
+    sa.Column("timestamp", sa.Text, nullable=False),
+    sa.Column("freq", sa.Text, nullable=False, server_default="1d"),
+    sa.Column("open", sa.Numeric, nullable=False),
+    sa.Column("high", sa.Numeric, nullable=False),
+    sa.Column("low", sa.Numeric, nullable=False),
+    sa.Column("close", sa.Numeric, nullable=False),
+    sa.Column("volume", sa.Numeric, nullable=False),
+    sa.PrimaryKeyConstraint("symbol", "timestamp", "freq"),
+)
+
+trades_table = sa.Table(
+    "trades",
+    metadata,
+    sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+    sa.Column("order_id", sa.Text, nullable=False),
+    sa.Column("strategy_id", sa.Text, nullable=False),
+    sa.Column("symbol", sa.Text, nullable=False),
+    sa.Column("side", sa.Text, nullable=False),
+    sa.Column("quantity", sa.Numeric, nullable=False),
+    sa.Column("price", sa.Numeric, nullable=False),
+    sa.Column("commission", sa.Numeric, nullable=False),
+    sa.Column("slippage_bps", sa.Numeric),
+    sa.Column("executed_at", sa.Text, nullable=False),
+    sa.Column("signal_value", sa.Numeric),
+)
+
+backtest_results_table = sa.Table(
+    "backtest_results",
+    metadata,
+    sa.Column("id", sa.Text, primary_key=True),
+    sa.Column("strategy_name", sa.Text, nullable=False),
+    sa.Column("config", sa.Text, nullable=False),
+    sa.Column("started_at", sa.Text, nullable=False),
+    sa.Column("finished_at", sa.Text),
+    sa.Column("status", sa.Text, nullable=False, server_default="running"),
+    sa.Column("sharpe", sa.Numeric),
+    sa.Column("max_drawdown", sa.Numeric),
+    sa.Column("total_return", sa.Numeric),
+    sa.Column("annual_return", sa.Numeric),
+    sa.Column("detail", sa.Text),
+)
+
+risk_events_table = sa.Table(
+    "risk_events",
+    metadata,
+    sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+    sa.Column("timestamp", sa.Text, nullable=False),
+    sa.Column("rule_name", sa.Text, nullable=False),
+    sa.Column("severity", sa.Text, nullable=False),
+    sa.Column("metric_value", sa.Numeric),
+    sa.Column("threshold", sa.Numeric),
+    sa.Column("action_taken", sa.Text, nullable=False),
+    sa.Column("message", sa.Text),
+)
+
+# ─── Engine helper ────────────────────────────────────────
+
 DEFAULT_DB_PATH = Path("data/quant.db")
 
 
+def _create_engine(url: str) -> sa.Engine:
+    """Create a SQLAlchemy engine. Sets WAL + busy_timeout for SQLite."""
+    engine = sa.create_engine(url)
+
+    if engine.dialect.name == "sqlite":
+        @event.listens_for(engine, "connect")
+        def _set_sqlite_pragma(dbapi_conn: object, connection_record: object) -> None:
+            cursor = dbapi_conn.cursor()  # type: ignore[attr-defined]
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA busy_timeout=5000")
+            cursor.close()
+
+    return engine
+
+
+# ─── DataStore ────────────────────────────────────────────
+
+
 class DataStore:
-    """輕量級數據存取層。"""
+    """數據存取層 — SQLAlchemy Core。"""
 
-    def __init__(self, db_path: str | Path | None = None):
-        self._db_path = Path(db_path) if db_path else DEFAULT_DB_PATH
-        self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._init_db()
+    def __init__(self, db_path: str | Path | None = None, url: str | None = None):
+        if url:
+            self._engine = _create_engine(url)
+        else:
+            path = Path(db_path) if db_path else DEFAULT_DB_PATH
+            path.parent.mkdir(parents=True, exist_ok=True)
+            self._engine = _create_engine(f"sqlite:///{path}")
 
-    def _get_conn(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(str(self._db_path))
-        conn.row_factory = sqlite3.Row
-        return conn
-
-    def _init_db(self) -> None:
-        """建立資料表。"""
-        with self._get_conn() as conn:
-            conn.executescript("""
-                CREATE TABLE IF NOT EXISTS bars (
-                    symbol      TEXT NOT NULL,
-                    timestamp   TEXT NOT NULL,
-                    freq        TEXT NOT NULL DEFAULT '1d',
-                    open        REAL NOT NULL,
-                    high        REAL NOT NULL,
-                    low         REAL NOT NULL,
-                    close       REAL NOT NULL,
-                    volume      REAL NOT NULL,
-                    PRIMARY KEY (symbol, timestamp, freq)
-                );
-
-                CREATE TABLE IF NOT EXISTS trades (
-                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-                    order_id        TEXT NOT NULL,
-                    strategy_id     TEXT NOT NULL,
-                    symbol          TEXT NOT NULL,
-                    side            TEXT NOT NULL,
-                    quantity        REAL NOT NULL,
-                    price           REAL NOT NULL,
-                    commission      REAL NOT NULL,
-                    slippage_bps    REAL,
-                    executed_at     TEXT NOT NULL,
-                    signal_value    REAL
-                );
-
-                CREATE TABLE IF NOT EXISTS backtest_results (
-                    id              TEXT PRIMARY KEY,
-                    strategy_name   TEXT NOT NULL,
-                    config          TEXT NOT NULL,
-                    started_at      TEXT NOT NULL,
-                    finished_at     TEXT,
-                    status          TEXT NOT NULL DEFAULT 'running',
-                    sharpe          REAL,
-                    max_drawdown    REAL,
-                    total_return    REAL,
-                    annual_return   REAL,
-                    detail          TEXT
-                );
-
-                CREATE TABLE IF NOT EXISTS risk_events (
-                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-                    timestamp       TEXT NOT NULL,
-                    rule_name       TEXT NOT NULL,
-                    severity        TEXT NOT NULL,
-                    metric_value    REAL,
-                    threshold       REAL,
-                    action_taken    TEXT NOT NULL,
-                    message         TEXT
-                );
-            """)
+        metadata.create_all(self._engine)
 
     # ─── Bars ────────────────────────────────────────
 
@@ -101,22 +132,41 @@ class DataStore:
 
         rows = []
         for ts, row in df.iterrows():
-            rows.append((
-                symbol,
-                str(ts),
-                freq,
-                float(row["open"]),
-                float(row["high"]),
-                float(row["low"]),
-                float(row["close"]),
-                float(row["volume"]),
-            ))
+            rows.append({
+                "symbol": symbol,
+                "timestamp": str(ts),
+                "freq": freq,
+                "open": float(row["open"]),
+                "high": float(row["high"]),
+                "low": float(row["low"]),
+                "close": float(row["close"]),
+                "volume": float(row["volume"]),
+            })
 
-        with self._get_conn() as conn:
-            conn.executemany(
-                "INSERT OR REPLACE INTO bars VALUES (?,?,?,?,?,?,?,?)",
-                rows,
-            )
+        with self._engine.begin() as conn:
+            if self._engine.dialect.name == "sqlite":
+                conn.execute(
+                    sa.text(
+                        "INSERT OR REPLACE INTO bars (symbol, timestamp, freq, "
+                        '"open", high, low, close, volume) '
+                        "VALUES (:symbol, :timestamp, :freq, :open, :high, :low, :close, :volume)"
+                    ),
+                    rows,
+                )
+            else:
+                from sqlalchemy.dialects.postgresql import insert as pg_insert
+                pg_stmt = pg_insert(bars_table).values(rows)
+                pg_stmt = pg_stmt.on_conflict_do_update(
+                    constraint=bars_table.primary_key,
+                    set_={
+                        "open": pg_stmt.excluded.open,
+                        "high": pg_stmt.excluded.high,
+                        "low": pg_stmt.excluded.low,
+                        "close": pg_stmt.excluded.close,
+                        "volume": pg_stmt.excluded.volume,
+                    },
+                )
+                conn.execute(pg_stmt)
 
         logger.info("Saved %d bars for %s", len(rows), symbol)
         return len(rows)
@@ -129,20 +179,18 @@ class DataStore:
         freq: str = "1d",
     ) -> pd.DataFrame:
         """從 DB 載入 K 線。"""
-        query = "SELECT * FROM bars WHERE symbol=? AND freq=?"
-        params: list = [symbol, freq]
+        t = bars_table
+        stmt = t.select().where(t.c.symbol == symbol, t.c.freq == freq)
 
         if start:
-            query += " AND timestamp >= ?"
-            params.append(start)
+            stmt = stmt.where(t.c.timestamp >= start)
         if end:
-            query += " AND timestamp <= ?"
-            params.append(end)
+            stmt = stmt.where(t.c.timestamp <= end)
 
-        query += " ORDER BY timestamp"
+        stmt = stmt.order_by(t.c.timestamp)
 
-        with self._get_conn() as conn:
-            df = pd.read_sql_query(query, conn, params=params)
+        with self._engine.connect() as conn:
+            df = pd.read_sql_query(stmt, conn)
 
         if df.empty:
             return pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
@@ -154,29 +202,42 @@ class DataStore:
     # ─── Trades ──────────────────────────────────────
 
     def save_trade(self, trade: Trade) -> None:
-        with self._get_conn() as conn:
+        with self._engine.begin() as conn:
             conn.execute(
-                """INSERT INTO trades
-                   (order_id, strategy_id, symbol, side, quantity, price,
-                    commission, slippage_bps, executed_at, signal_value)
-                   VALUES (?,?,?,?,?,?,?,?,?,?)""",
-                (
-                    trade.order_id,
-                    trade.strategy_id,
-                    trade.symbol,
-                    trade.side.value,
-                    float(trade.quantity),
-                    float(trade.price),
-                    float(trade.commission),
-                    float(trade.slippage_bps),
-                    str(trade.timestamp),
-                    trade.signal_value,
-                ),
+                trades_table.insert().values(
+                    order_id=trade.order_id,
+                    strategy_id=trade.strategy_id,
+                    symbol=trade.symbol,
+                    side=trade.side.value,
+                    quantity=float(trade.quantity),
+                    price=float(trade.price),
+                    commission=float(trade.commission),
+                    slippage_bps=float(trade.slippage_bps),
+                    executed_at=str(trade.timestamp),
+                    signal_value=trade.signal_value,
+                )
             )
 
     def save_trades(self, trades: list[Trade]) -> None:
-        for t in trades:
-            self.save_trade(t)
+        if not trades:
+            return
+        rows = [
+            {
+                "order_id": t.order_id,
+                "strategy_id": t.strategy_id,
+                "symbol": t.symbol,
+                "side": t.side.value,
+                "quantity": float(t.quantity),
+                "price": float(t.price),
+                "commission": float(t.commission),
+                "slippage_bps": float(t.slippage_bps),
+                "executed_at": str(t.timestamp),
+                "signal_value": t.signal_value,
+            }
+            for t in trades
+        ]
+        with self._engine.begin() as conn:
+            conn.execute(trades_table.insert(), rows)
 
     def load_trades(
         self,
@@ -184,23 +245,20 @@ class DataStore:
         start: str | None = None,
         end: str | None = None,
     ) -> pd.DataFrame:
-        query = "SELECT * FROM trades WHERE 1=1"
-        params: list = []
+        t = trades_table
+        stmt = t.select()
 
         if strategy_id:
-            query += " AND strategy_id=?"
-            params.append(strategy_id)
+            stmt = stmt.where(t.c.strategy_id == strategy_id)
         if start:
-            query += " AND executed_at >= ?"
-            params.append(start)
+            stmt = stmt.where(t.c.executed_at >= start)
         if end:
-            query += " AND executed_at <= ?"
-            params.append(end)
+            stmt = stmt.where(t.c.executed_at <= end)
 
-        query += " ORDER BY executed_at"
+        stmt = stmt.order_by(t.c.executed_at)
 
-        with self._get_conn() as conn:
-            return pd.read_sql_query(query, conn, params=params)
+        with self._engine.connect() as conn:
+            return pd.read_sql_query(stmt, conn)
 
     # ─── Backtest Results ────────────────────────────
 
@@ -208,53 +266,62 @@ class DataStore:
         self,
         result_id: str,
         strategy_name: str,
-        config: dict,
+        config: dict[str, object],
         sharpe: float,
         max_drawdown: float,
         total_return: float,
         annual_return: float,
-        detail: dict | None = None,
+        detail: dict[str, object] | None = None,
     ) -> None:
-        now = datetime.utcnow().isoformat()
-        with self._get_conn() as conn:
-            conn.execute(
-                """INSERT OR REPLACE INTO backtest_results
-                   (id, strategy_name, config, started_at, finished_at, status,
-                    sharpe, max_drawdown, total_return, annual_return, detail)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
-                (
-                    result_id,
-                    strategy_name,
-                    json.dumps(config),
-                    now,
-                    now,
-                    "completed",
-                    sharpe,
-                    max_drawdown,
-                    total_return,
-                    annual_return,
-                    json.dumps(detail) if detail else None,
-                ),
-            )
+        now = datetime.now(timezone.utc).isoformat()
+        row = {
+            "id": result_id,
+            "strategy_name": strategy_name,
+            "config": json.dumps(config),
+            "started_at": now,
+            "finished_at": now,
+            "status": "completed",
+            "sharpe": sharpe,
+            "max_drawdown": max_drawdown,
+            "total_return": total_return,
+            "annual_return": annual_return,
+            "detail": json.dumps(detail) if detail else None,
+        }
+
+        dialect = self._engine.dialect.name
+        with self._engine.begin() as conn:
+            if dialect == "sqlite":
+                conn.execute(
+                    sa.text(
+                        "INSERT OR REPLACE INTO backtest_results "
+                        "(id, strategy_name, config, started_at, finished_at, status, "
+                        "sharpe, max_drawdown, total_return, annual_return, detail) "
+                        "VALUES (:id, :strategy_name, :config, :started_at, :finished_at, "
+                        ":status, :sharpe, :max_drawdown, :total_return, :annual_return, :detail)"
+                    ),
+                    row,
+                )
+            else:
+                from sqlalchemy.dialects.postgresql import insert as pg_insert
+                pg_stmt = pg_insert(backtest_results_table).values(**row)
+                pg_stmt = pg_stmt.on_conflict_do_update(
+                    constraint=backtest_results_table.primary_key,
+                    set_={k: v for k, v in row.items() if k != "id"},
+                )
+                conn.execute(pg_stmt)
 
     # ─── Risk Events ────────────────────────────────
 
-    def save_risk_event(self, alert: "RiskAlert") -> None:
-        from src.domain.models import RiskAlert
-
-        with self._get_conn() as conn:
+    def save_risk_event(self, alert: RiskAlert) -> None:
+        with self._engine.begin() as conn:
             conn.execute(
-                """INSERT INTO risk_events
-                   (timestamp, rule_name, severity, metric_value, threshold,
-                    action_taken, message)
-                   VALUES (?,?,?,?,?,?,?)""",
-                (
-                    str(alert.timestamp),
-                    alert.rule_name,
-                    alert.severity.value,
-                    alert.metric_value,
-                    alert.threshold,
-                    alert.action_taken,
-                    alert.message,
-                ),
+                risk_events_table.insert().values(
+                    timestamp=str(alert.timestamp),
+                    rule_name=alert.rule_name,
+                    severity=alert.severity.value,
+                    metric_value=alert.metric_value,
+                    threshold=alert.threshold,
+                    action_taken=alert.action_taken,
+                    message=alert.message,
+                )
             )

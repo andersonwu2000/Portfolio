@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { useApi, useWs } from "@core/hooks";
 import { portfolioApi, strategiesApi } from "../api";
-import type { Portfolio, StrategyInfo } from "@core/types";
+import type { Portfolio, StrategyInfo } from "@quant/shared";
 
 export function useDashboard() {
   const { data: pf, error, refresh, setData: setPf } = useApi<Portfolio>(portfolioApi.get);
@@ -9,17 +9,17 @@ export function useDashboard() {
   const [navHistory, setNavHistory] = useState<{ time: string; nav: number }[]>([]);
 
   useWs("portfolio", useCallback((msg: unknown) => {
-    const d = msg as Portfolio;
-    if (d && typeof d.nav === "number") {
-      setPf(d);
-      setNavHistory((prev) => {
-        const entry = {
-          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          nav: d.nav,
-        };
-        return [...prev.slice(-59), entry];
-      });
-    }
+    // Type guard: verify WS message structure before casting
+    if (!msg || typeof msg !== "object" || !("nav" in msg) || typeof (msg as Record<string, unknown>).nav !== "number") return;
+    const d = msg as Partial<Portfolio>;
+    setPf((prev) => prev ? { ...prev, ...d } as Portfolio : prev);
+    setNavHistory((prev) => {
+      const entry = {
+        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        nav: (msg as Record<string, unknown>).nav as number,
+      };
+      return [...prev.slice(-59), entry];
+    });
   }, [setPf]));
 
   const running = strats?.filter((s) => s.status === "running").length ?? 0;

@@ -17,6 +17,12 @@ import type {
   HealthCheck,
 } from "../types";
 
+export const auth = {
+  login: (apiKey: string) =>
+    post<{ access_token: string; token_type: string }>("/api/v1/auth/login", { api_key: apiKey }),
+  logout: () => post<{ detail: string }>("/api/v1/auth/logout", {}),
+};
+
 export const system = {
   health: () => get<HealthCheck>("/api/v1/system/health"),
   status: () => get<SystemStatus>("/api/v1/system/status"),

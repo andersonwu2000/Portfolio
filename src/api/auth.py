@@ -1,12 +1,13 @@
 """
-認證與授權 — API Key + JWT。
+認證與授權 — API Key + JWT（支援 Bearer header 和 httpOnly cookie）。
 """
 
 from __future__ import annotations
 
+import hmac
 from datetime import datetime, timedelta, timezone
 
-from fastapi import Depends, HTTPException, Security, status
+from fastapi import Depends, HTTPException, Request, Security, status
 from fastapi.security import APIKeyHeader, HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 
@@ -16,15 +17,37 @@ api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
-def verify_api_key(api_key: str | None = Security(api_key_header)) -> str:
-    """驗證 API Key。"""
+def verify_api_key(
+    request: Request,
+    api_key: str | None = Security(api_key_header),
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer_scheme),
+) -> str:
+    """驗證 API Key 或 JWT Bearer token（含 httpOnly cookie fallback）。"""
     config = get_config()
-    if not api_key or api_key != config.api_key:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid API key",
-        )
-    return api_key
+
+    # 1. X-API-Key header (constant-time comparison)
+    if api_key and hmac.compare_digest(api_key, config.api_key):
+        return "api_key_authenticated"
+
+    # 2. Bearer token
+    token: str | None = None
+    if credentials:
+        token = credentials.credentials
+    # 3. httpOnly cookie fallback
+    if not token:
+        token = request.cookies.get("access_token")
+
+    if token:
+        try:
+            jwt.decode(token, config.jwt_secret, algorithms=["HS256"])
+            return "jwt_authenticated"
+        except JWTError:
+            pass
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid API key",
+    )
 
 
 def create_jwt_token(subject: str, role: str = "trader") -> str:
@@ -40,28 +63,49 @@ def create_jwt_token(subject: str, role: str = "trader") -> str:
 
 
 def verify_jwt(
+    request: Request,
+    api_key: str | None = Security(api_key_header),
     credentials: HTTPAuthorizationCredentials | None = Security(bearer_scheme),
 ) -> dict:
-    """驗證 JWT token，返回 payload。"""
-    if credentials is None:
+    """驗證 JWT token（Bearer header 或 httpOnly cookie），返回 payload。API Key 視為 admin。"""
+    config = get_config()
+
+    # API Key 視為 admin 角色（持有 master key = 最高權限）
+    if api_key and hmac.compare_digest(api_key, config.api_key):
+        return {"sub": "api_key_user", "role": "admin"}
+
+    token: str | None = None
+
+    # 1. 優先從 Bearer header 取 token
+    if credentials:
+        token = credentials.credentials
+    # 2. 回退到 httpOnly cookie
+    if not token:
+        token = request.cookies.get("access_token")
+    # 3. 皆無 → 401
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing authorization token",
         )
 
-    config = get_config()
     try:
-        payload = jwt.decode(
-            credentials.credentials,
-            config.jwt_secret,
-            algorithms=["HS256"],
-        )
+        payload = jwt.decode(token, config.jwt_secret, algorithms=["HS256"])
         return payload
-    except JWTError as e:
+    except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid token: {e}",
+            detail="Invalid or expired token",
         )
+
+
+def verify_ws_token(token: str) -> dict | None:
+    """驗證 WebSocket 連線的 JWT token，返回 payload 或 None。"""
+    config = get_config()
+    try:
+        return jwt.decode(token, config.jwt_secret, algorithms=["HS256"])
+    except JWTError:
+        return None
 
 
 def require_role(required_role: str):

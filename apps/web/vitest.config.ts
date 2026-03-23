@@ -1,0 +1,17 @@
+import { defineConfig } from "vitest/config";
+import { resolve } from "path";
+
+export default defineConfig({
+  test: {
+    environment: "jsdom",
+    globals: true,
+  },
+  resolve: {
+    alias: {
+      "@quant/shared": resolve(__dirname, "../shared/src"),
+      "@core": resolve(__dirname, "src/core"),
+      "@feat": resolve(__dirname, "src/features"),
+      "@shared": resolve(__dirname, "src/shared"),
+    },
+  },
+});

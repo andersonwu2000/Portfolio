@@ -22,10 +22,16 @@ const defaultForm: BacktestRequest = {
 export function BacktestPage() {
   const { t } = useT();
   const [form, setForm] = useState(defaultForm);
-  const { running, result, error, submit } = useBacktest();
+  const { running, result, error, progress, submit } = useBacktest();
 
   const set = (key: keyof BacktestRequest, val: unknown) =>
     setForm((f) => ({ ...f, [key]: val }));
+
+  const formErrors: string[] = [];
+  if (form.start >= form.end) formErrors.push("End date must be after start date");
+  if (form.initial_cash <= 0) formErrors.push("Initial cash must be positive");
+  if (form.universe.length === 0) formErrors.push("Universe must have at least 1 symbol");
+  const formValid = formErrors.length === 0;
 
   const strategyOptions = [
     { value: "momentum", label: "momentum" },
@@ -87,10 +93,17 @@ export function BacktestPage() {
           <AnimatedSelect value={form.rebalance_freq} options={rebalanceOptions} onChange={(v) => set("rebalance_freq", v)} />
         </div>
 
-        <div className="col-span-full">
-          <button type="submit" disabled={running}
+        <div className="col-span-full space-y-2">
+          {formErrors.length > 0 && (
+            <ul className="text-sm text-amber-400 list-disc list-inside">
+              {formErrors.map((e) => <li key={e}>{e}</li>)}
+            </ul>
+          )}
+          <button type="submit" disabled={running || !formValid}
             className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors">
-            {running ? t.backtest.running : t.backtest.run}
+            {running
+              ? (progress ? `${t.backtest.running} (${progress.current}/${progress.total})` : t.backtest.running)
+              : t.backtest.run}
           </button>
         </div>
       </form>

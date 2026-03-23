@@ -6,6 +6,7 @@ export function useBacktest() {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<BacktestResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -19,32 +20,47 @@ export function useBacktest() {
     setRunning(true);
     setError(null);
     setResult(null);
+    setProgress(null);
     try {
       const summary = await backtestApi.submit(form);
-      const poll = async (): Promise<void> => {
-        if (!mountedRef.current) return;
+
+      // Iterative polling with 30-minute timeout
+      const MAX_POLL_MS = 30 * 60 * 1000;
+      const pollStart = Date.now();
+      let status = summary.status;
+      while (status === "running" && mountedRef.current) {
+        if (Date.now() - pollStart > MAX_POLL_MS) {
+          setError("Backtest timed out (30 minutes)");
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 2000));
+        if (!mountedRef.current) break;
         const s = await backtestApi.status(summary.task_id);
-        if (!mountedRef.current) return;
-        if (s.status === "running") {
-          await new Promise((r) => setTimeout(r, 2000));
-          return poll();
+        status = s.status;
+        if (s.progress_current != null && s.progress_total != null) {
+          setProgress({ current: s.progress_current, total: s.progress_total });
         }
-        if (s.status === "completed") {
-          const r = await backtestApi.result(summary.task_id);
-          if (mountedRef.current) setResult(r);
-        } else {
-          if (mountedRef.current) setError("Backtest failed");
-        }
-      };
-      await poll();
+      }
+
+      if (!mountedRef.current) return;
+
+      if (status === "completed") {
+        const r = await backtestApi.result(summary.task_id);
+        if (mountedRef.current) setResult(r);
+      } else if (status === "failed") {
+        if (mountedRef.current) setError("Backtest failed");
+      }
     } catch (err) {
       if (mountedRef.current) {
         setError(err instanceof Error ? err.message : "Request failed");
       }
     } finally {
-      if (mountedRef.current) setRunning(false);
+      if (mountedRef.current) {
+        setRunning(false);
+        setProgress(null);
+      }
     }
   };
 
-  return { running, result, error, submit };
+  return { running, result, error, progress, submit };
 }

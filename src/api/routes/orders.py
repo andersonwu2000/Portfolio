@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from src.api.auth import verify_api_key
 from src.api.schemas import OrderResponse
@@ -14,9 +14,11 @@ router = APIRouter(prefix="/orders", tags=["orders"])
 @router.get("", response_model=list[OrderResponse])
 async def list_orders(
     status: str | None = None,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     api_key: str = Depends(verify_api_key),
 ):
-    """列出訂單。"""
+    """列出訂單（支援分頁）。"""
     state = get_app_state()
     orders = state.oms.get_all_orders()
 
@@ -24,6 +26,8 @@ async def list_orders(
         orders = [o for o in orders if not o.is_terminal]
     elif status == "filled":
         orders = [o for o in orders if o.status.value == "FILLED"]
+
+    paginated = orders[offset:offset + limit]
 
     return [
         OrderResponse(
@@ -39,5 +43,5 @@ async def list_orders(
             created_at=str(o.created_at),
             strategy_id=o.strategy_id,
         )
-        for o in orders
+        for o in paginated
     ]

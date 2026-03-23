@@ -67,7 +67,7 @@ Key design decisions:
 - `src/backtest/engine.py` — Orchestrates: download data → iterate trading dates → call strategy → risk check → execute → update portfolio
 - `src/api/` — FastAPI REST + WebSocket. `AppState` singleton holds runtime state. JWT auth with role hierarchy (viewer < researcher < trader < risk_manager < admin)
 
-**Adding a new strategy**: Create a file in `strategies/`, subclass `Strategy` from `src/strategy/base.py`, implement `name()` and `on_bar(ctx) -> dict[str, float]`. Register it in `src/backtest/engine.py:_resolve_strategy()`.
+**Adding a new strategy**: Create a file in `strategies/`, subclass `Strategy` from `src/strategy/base.py`, implement `name()` and `on_bar(ctx) -> dict[str, float]`. Register it in `_resolve_strategy()` in both `src/api/routes/backtest.py` and `src/cli/main.py`.
 
 ## Frontend Architecture
 

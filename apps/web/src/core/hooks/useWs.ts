@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
-import { WSManager } from "../api/ws";
-import type { Channel } from "../api/ws";
+import { WSManager } from "@quant/shared";
+import type { Channel } from "@quant/shared";
 
 export function useWs(channel: Channel, onMessage: (data: unknown) => void) {
   const handlerRef = useRef(onMessage);

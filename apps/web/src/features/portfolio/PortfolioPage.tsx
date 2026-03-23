@@ -2,7 +2,7 @@ import { useApi } from "@core/hooks";
 import { fmtCurrency, fmtPct, pnlColor } from "@core/utils";
 import { ErrorAlert } from "@shared/ui";
 import { useT } from "@core/i18n";
-import type { Portfolio } from "@core/types";
+import type { Portfolio } from "@quant/shared";
 import { portfolioApi } from "./api";
 
 export function PortfolioPage() {

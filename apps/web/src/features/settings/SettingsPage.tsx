@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useApi } from "@core/hooks";
-import { getApiKey, setApiKey } from "@core/api";
+import { isAuthenticated, login } from "@core/api";
 import { MetricCard } from "@shared/ui";
 import { useT } from "@core/i18n";
 import { langLabels, type Lang } from "@core/i18n";
@@ -9,14 +9,27 @@ import { systemApi } from "./api";
 export function SettingsPage({ onSave }: { onSave?: () => void } = {}) {
   const { t, lang, setLang } = useT();
   const { data: status, loading } = useApi(systemApi.status);
-  const [key, setKey] = useState(getApiKey());
+  const [key, setKey] = useState("");
   const [saved, setSaved] = useState(false);
+  const [loginError, setLoginError] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const handleSave = () => {
-    setApiKey(key);
-    setSaved(true);
-    onSave?.();
-    setTimeout(() => setSaved(false), 2000);
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  const handleSave = async () => {
+    setLoginError("");
+    setLoginLoading(true);
+    try {
+      await login(key);
+      setSaved(true);
+      onSave?.();
+      timerRef.current = setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      setLoginError(err instanceof Error ? err.message : "Login failed");
+    } finally {
+      setLoginLoading(false);
+    }
   };
 
   const fmtUptime = (s: number) => {
@@ -29,7 +42,7 @@ export function SettingsPage({ onSave }: { onSave?: () => void } = {}) {
     <div className="space-y-6">
       <h2 className="text-xl font-bold">{t.settings.title}</h2>
 
-      {!getApiKey() && (
+      {!isAuthenticated() && (
         <div className="bg-amber-500/10 text-amber-400 rounded-xl p-4 text-sm">
           {t.settings.apiKeyHint} <code className="bg-surface-dark px-1.5 py-0.5 rounded">dev-key</code>
         </div>
@@ -45,11 +58,17 @@ export function SettingsPage({ onSave }: { onSave?: () => void } = {}) {
             placeholder={t.settings.apiKeyPlaceholder}
             className="flex-1 bg-surface-dark border border-surface-light rounded-lg px-3 py-2 text-sm"
           />
-          <button onClick={handleSave}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition-colors">
-            {saved ? t.settings.saved : t.settings.save}
+          <button
+            onClick={handleSave}
+            disabled={loginLoading || !key.trim()}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors"
+          >
+            {loginLoading ? "..." : saved ? t.settings.saved : t.settings.save}
           </button>
         </div>
+        {loginError && (
+          <p className="text-sm text-red-400">{loginError}</p>
+        )}
       </div>
 
       <div className="bg-surface rounded-xl p-5 space-y-4">

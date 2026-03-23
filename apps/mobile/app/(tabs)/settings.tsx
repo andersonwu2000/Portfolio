@@ -1,7 +1,8 @@
 import { View, Text, ScrollView, Pressable, Alert, StyleSheet } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useState, useEffect, useCallback } from "react";
-import type { SystemStatus, RiskRule } from "../../src/types";
-import { system, risk } from "../../src/api/endpoints";
+import type { SystemStatus, RiskRule } from "@quant/shared";
+import { system, risk } from "@quant/shared";
 import { useAuth } from "../../src/hooks/useAuth";
 
 export default function SettingsScreen() {
@@ -33,7 +34,8 @@ export default function SettingsScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+    <ScrollView style={{ flex: 1, padding: 16 }}>
       {/* System Status */}
       <Text style={styles.sectionTitle}>System</Text>
       {status && (
@@ -78,6 +80,7 @@ export default function SettingsScreen() {
 
       <View style={{ height: 40 }} />
     </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -91,7 +94,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0F172A", padding: 16 },
+  container: { flex: 1, backgroundColor: "#0F172A" },
   sectionTitle: { color: "#F1F5F9", fontSize: 18, fontWeight: "700", marginBottom: 12, marginTop: 8 },
   card: { backgroundColor: "#1E293B", borderRadius: 12, padding: 4, marginBottom: 20 },
   infoRow: {

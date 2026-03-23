@@ -61,7 +61,7 @@ def weights_to_orders(
         inst = (instruments or {}).get(symbol, Instrument(symbol=symbol))
         lot_size = inst.lot_size
         if lot_size > 0:
-            qty = Decimal(str(int(qty / lot_size) * lot_size))
+            qty = (qty // Decimal(str(lot_size))) * Decimal(str(lot_size))
 
         if qty <= 0:
             continue

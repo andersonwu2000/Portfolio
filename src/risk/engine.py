@@ -132,7 +132,16 @@ class RiskEngine:
     def clear_alerts(self) -> None:
         self._alerts.clear()
 
+    def reset_state(self) -> None:
+        """重置所有有狀態的規則（回測間清除用）。"""
+        for rule in self.rules:
+            rule.reset()
+
+    _MAX_ALERTS = 10000
+
     def _record_alert(self, rule: str, message: str, severity: Severity) -> None:
+        if len(self._alerts) >= self._MAX_ALERTS:
+            self._alerts = self._alerts[-self._MAX_ALERTS // 2 :]
         self._alerts.append(
             RiskAlert(
                 timestamp=datetime.now(timezone.utc),

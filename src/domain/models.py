@@ -99,12 +99,6 @@ class Position:
             * self.instrument.multiplier
         )
 
-    @property
-    def weight(self) -> Decimal:
-        """需要外部設定 _nav 才能計算。"""
-        if not hasattr(self, "_nav") or self._nav == 0:  # type: ignore[attr-defined]
-            return Decimal("0")
-        return self.market_value / self._nav  # type: ignore[attr-defined]
 
 
 @dataclass
@@ -137,7 +131,7 @@ class Order:
     @property
     def notional(self) -> Decimal:
         """訂單名義金額。"""
-        px = self.price or self.instrument.tick_size  # fallback
+        px = self.price or Decimal("0")  # market orders: notional unknown without market price
         return self.quantity * px * self.instrument.multiplier
 
 
@@ -148,6 +142,7 @@ class Portfolio:
     cash: Decimal = Decimal("1000000")
     as_of: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     initial_cash: Decimal = Decimal("1000000")
+    nav_sod: Decimal = Decimal("0")  # start-of-day NAV（回測引擎更新）
 
     @property
     def nav(self) -> Decimal:
@@ -164,16 +159,15 @@ class Portfolio:
 
     @property
     def daily_pnl(self) -> Decimal:
-        """需要外部設定 _nav_sod (start-of-day NAV)。"""
-        if not hasattr(self, "_nav_sod"):  # type: ignore[attr-defined]
+        if self.nav_sod == 0:
             return Decimal("0")
-        return self.nav - self._nav_sod  # type: ignore[attr-defined]
+        return self.nav - self.nav_sod
 
     @property
     def daily_drawdown(self) -> Decimal:
-        if not hasattr(self, "_nav_sod") or self._nav_sod == 0:  # type: ignore[attr-defined]
+        if self.nav_sod == 0:
             return Decimal("0")
-        return -self.daily_pnl / self._nav_sod  # type: ignore[attr-defined]
+        return -self.daily_pnl / self.nav_sod
 
     def get_position_weight(self, symbol: str) -> Decimal:
         if symbol not in self.positions or self.nav == 0:

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
-from src.api.auth import verify_api_key
+from src.api.auth import verify_api_key, require_role
 from src.api.schemas import RiskAlertResponse, RiskRuleResponse
 from src.api.state import get_app_state
 
@@ -22,7 +22,7 @@ async def get_risk_rules(api_key: str = Depends(verify_api_key)):
 
 
 @router.put("/rules/{rule_name}")
-async def toggle_rule(rule_name: str, enabled: bool = True, api_key: str = Depends(verify_api_key)):
+async def toggle_rule(rule_name: str, enabled: bool = True, api_key: str = Depends(verify_api_key), _role: dict = Depends(require_role("risk_manager"))):
     """啟用/停用風控規則。"""
     state = get_app_state()
     for rule in state.risk_engine.rules:
@@ -33,9 +33,15 @@ async def toggle_rule(rule_name: str, enabled: bool = True, api_key: str = Depen
 
 
 @router.get("/alerts", response_model=list[RiskAlertResponse])
-async def get_risk_alerts(api_key: str = Depends(verify_api_key)):
-    """取得風控告警歷史。"""
+async def get_risk_alerts(
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    api_key: str = Depends(verify_api_key),
+):
+    """取得風控告警歷史（支援分頁）。"""
     state = get_app_state()
+    alerts = state.risk_engine.get_alerts()
+    paginated = alerts[offset:offset + limit]
     return [
         RiskAlertResponse(
             timestamp=str(a.timestamp),
@@ -46,12 +52,12 @@ async def get_risk_alerts(api_key: str = Depends(verify_api_key)):
             action_taken=a.action_taken,
             message=a.message,
         )
-        for a in state.risk_engine.get_alerts()
+        for a in paginated
     ]
 
 
 @router.post("/kill-switch")
-async def kill_switch(api_key: str = Depends(verify_api_key)):
+async def kill_switch(api_key: str = Depends(verify_api_key), _role: dict = Depends(require_role("risk_manager"))):
     """緊急熔斷：停止所有策略，撤銷所有訂單。"""
     state = get_app_state()
 

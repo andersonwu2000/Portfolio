@@ -26,6 +26,7 @@ class RiskRule:
     name: str
     check: Callable[[Order, Portfolio, MarketState], RiskDecision]
     enabled: bool = True
+    reset: Callable[[], None] = lambda: None  # 重置有狀態的規則
 
     def __call__(self, order: Order, portfolio: Portfolio, market: MarketState) -> RiskDecision:
         if not self.enabled:
@@ -47,8 +48,9 @@ def max_position_weight(threshold: float = 0.05) -> RiskRule:
         if symbol in portfolio.positions:
             current_mv = portfolio.positions[symbol].market_value
 
-        # 預估下單後的市值
-        order_value = order.quantity * (order.price or Decimal("0"))
+        # 預估下單後的市值（市價單使用當前市價）
+        price = order.price or market.prices.get(symbol, Decimal("0"))
+        order_value = order.quantity * price
         if order.side.value == "BUY":
             projected_mv = current_mv + order_value
         else:
@@ -71,7 +73,9 @@ def max_order_notional(threshold_pct: float = 0.02) -> RiskRule:
         if portfolio.nav <= 0:
             return RiskDecision.APPROVE()
 
-        notional = order.quantity * (order.price or Decimal("0"))
+        # 市價單使用當前市價
+        price = order.price or market.prices.get(order.instrument.symbol, Decimal("0"))
+        notional = order.quantity * price
         pct = float(notional / portfolio.nav)
 
         if pct > threshold_pct:
@@ -126,10 +130,21 @@ def max_daily_trades(limit: int = 100) -> RiskRule:
         count = trade_count.get(today, 0)
         if count >= limit:
             return RiskDecision.REJECT(f"今日交易次數已達上限 {limit}")
-        trade_count[today] = count + 1
+        # Don't increment here — call record_trade() after execution
         return RiskDecision.APPROVE()
 
-    return RiskRule(f"max_daily_trades_{limit}", check)
+    def record_trade() -> None:
+        """Called after a trade actually executes to increment the counter."""
+        from datetime import datetime, timezone
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        trade_count[today] = trade_count.get(today, 0) + 1
+
+    def reset() -> None:
+        trade_count.clear()
+
+    rule = RiskRule(f"max_daily_trades_{limit}", check, reset=reset)
+    rule.record_trade = record_trade  # type: ignore[attr-defined]
+    return rule
 
 
 def max_order_vs_adv(threshold: float = 0.10) -> RiskRule:

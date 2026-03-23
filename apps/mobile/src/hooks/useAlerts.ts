@@ -1,40 +1,17 @@
-import { useState, useEffect, useCallback } from "react";
-import type { RiskAlert } from "../types";
-import { risk } from "../api/endpoints";
-import { WSManager } from "../api/ws";
+import { useCallback } from "react";
+import type { RiskAlert } from "@quant/shared";
+import { risk } from "@quant/shared";
+import { useRealtimeData } from "./useRealtimeData";
+
+const MAX_ALERTS = 200;
+
+const mergeAlert = (prev: RiskAlert[], update: unknown) =>
+  [update as RiskAlert, ...prev].slice(0, MAX_ALERTS);
+
+const fetchAlerts = () => risk.alerts().then((r) => r.slice(0, MAX_ALERTS));
 
 export function useAlerts() {
-  const [alerts, setAlerts] = useState<RiskAlert[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const refresh = useCallback(async () => {
-    try {
-      const result = await risk.alerts();
-      setAlerts(result);
-    } catch {
-      // silently fail, alerts will update via WebSocket
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  // Real-time alerts via WebSocket
-  useEffect(() => {
-    const ws = new WSManager("alerts");
-    ws.connect();
-    const unsubscribe = ws.subscribe((data) => {
-      const alert = data as RiskAlert;
-      setAlerts((prev) => [alert, ...prev]);
-    });
-    return () => {
-      unsubscribe();
-      ws.disconnect();
-    };
-  }, []);
-
+  const fetcher = useCallback(() => fetchAlerts(), []);
+  const { data: alerts, loading, refresh } = useRealtimeData<RiskAlert[]>(fetcher, "alerts", mergeAlert, []);
   return { alerts, loading, refresh };
 }

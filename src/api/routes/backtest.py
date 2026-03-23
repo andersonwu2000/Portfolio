@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
+import traceback
 import uuid
-import threading
+from collections import OrderedDict
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from src.api.auth import verify_api_key
 from src.api.schemas import (
@@ -15,14 +20,21 @@ from src.api.schemas import (
 )
 from src.api.state import get_app_state
 from src.backtest.engine import BacktestConfig, BacktestEngine
+from src.config import get_config
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/backtest", tags=["backtest"])
+_limiter = Limiter(key_func=get_remote_address)
+_MAX_BACKTEST_TASKS = 50  # evict oldest tasks beyond this limit
+_background_tasks: set[asyncio.Task] = set()  # prevent GC of fire-and-forget tasks
 
 
 @router.post("", response_model=BacktestSummaryResponse)
-async def submit_backtest(req: BacktestRequest, api_key: str = Depends(verify_api_key)):
+@_limiter.limit("10/minute")
+async def submit_backtest(request: Request, req: BacktestRequest, api_key: str = Depends(verify_api_key)):
     """提交回測任務（異步執行）。"""
     state = get_app_state()
+    config = get_config()
     task_id = uuid.uuid4().hex[:8]
 
     # 記錄任務
@@ -30,13 +42,13 @@ async def submit_backtest(req: BacktestRequest, api_key: str = Depends(verify_ap
         "status": "running",
         "strategy_name": req.strategy,
         "result": None,
+        "progress": None,
     }
 
-    # 在背景執行緒執行回測
     def _run():
         try:
             strategy = _resolve_strategy(req.strategy, req.params)
-            config = BacktestConfig(
+            bt_config = BacktestConfig(
                 universe=req.universe,
                 start=req.start,
                 end=req.end,
@@ -45,16 +57,59 @@ async def submit_backtest(req: BacktestRequest, api_key: str = Depends(verify_ap
                 commission_rate=req.commission_rate,
                 rebalance_freq=req.rebalance_freq,
             )
-            engine = BacktestEngine()
-            result = engine.run(strategy, config)
-            state.backtest_tasks[task_id]["status"] = "completed"
-            state.backtest_tasks[task_id]["result"] = result
-        except Exception as e:
-            state.backtest_tasks[task_id]["status"] = "failed"
-            state.backtest_tasks[task_id]["error"] = str(e)
 
-    thread = threading.Thread(target=_run, daemon=True)
-    thread.start()
+            def progress_cb(current: int, total: int) -> None:
+                with state.backtest_lock:
+                    state.backtest_tasks[task_id]["progress"] = {
+                        "current": current,
+                        "total": total,
+                    }
+
+            engine = BacktestEngine()
+            result = engine.run(strategy, bt_config, progress_callback=progress_cb)
+            with state.backtest_lock:
+                state.backtest_tasks[task_id]["status"] = "completed"
+                state.backtest_tasks[task_id]["result"] = result
+        except Exception as e:
+            logger.exception("Backtest %s failed", task_id)
+            with state.backtest_lock:
+                state.backtest_tasks[task_id]["status"] = "failed"
+                state.backtest_tasks[task_id]["error"] = str(e)
+
+    # 在背景執行，設定超時
+    async def _run_with_timeout():
+        try:
+            await asyncio.wait_for(
+                asyncio.to_thread(_run),
+                timeout=config.backtest_timeout,
+            )
+        except asyncio.TimeoutError:
+            with state.backtest_lock:
+                state.backtest_tasks[task_id]["status"] = "failed"
+                state.backtest_tasks[task_id]["error"] = (
+                    f"Backtest timed out after {config.backtest_timeout}s"
+                )
+
+    # Evict oldest completed/failed tasks if over limit
+    if len(state.backtest_tasks) >= _MAX_BACKTEST_TASKS:
+        to_remove = [
+            tid for tid, t in state.backtest_tasks.items()
+            if t["status"] in ("completed", "failed")
+        ]
+        # Remove half of completed tasks, or all if needed
+        remove_count = max(1, len(state.backtest_tasks) - _MAX_BACKTEST_TASKS + 1)
+        for tid in to_remove[:remove_count]:
+            del state.backtest_tasks[tid]
+        # If still at capacity (all running), reject
+        if len(state.backtest_tasks) >= _MAX_BACKTEST_TASKS:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Too many concurrent backtests (max {_MAX_BACKTEST_TASKS})",
+            )
+
+    task = asyncio.create_task(_run_with_timeout())
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
 
     return BacktestSummaryResponse(
         task_id=task_id,
@@ -72,6 +127,7 @@ async def get_backtest_status(task_id: str, api_key: str = Depends(verify_api_ke
         raise HTTPException(status_code=404, detail="Backtest task not found")
 
     result = task.get("result")
+    progress = task.get("progress")
     return BacktestSummaryResponse(
         task_id=task_id,
         status=task["status"],
@@ -81,6 +137,9 @@ async def get_backtest_status(task_id: str, api_key: str = Depends(verify_api_ke
         sharpe=result.sharpe if result else None,
         max_drawdown=result.max_drawdown if result else None,
         total_trades=result.total_trades if result else None,
+        progress_current=progress["current"] if progress else None,
+        progress_total=progress["total"] if progress else None,
+        error=task.get("error"),
     )
 
 
@@ -136,4 +195,10 @@ def _resolve_strategy(name: str, params: dict):
     if cls is None:
         raise ValueError(f"Unknown strategy: {name}. Available: {list(strategy_map.keys())}")
 
-    return cls(**params) if params else cls()
+    if params:
+        # Only pass params that match the constructor's declared parameters
+        import inspect
+        valid_params = set(inspect.signature(cls.__init__).parameters.keys()) - {"self"}
+        filtered = {k: v for k, v in params.items() if k in valid_params}
+        return cls(**filtered)
+    return cls()

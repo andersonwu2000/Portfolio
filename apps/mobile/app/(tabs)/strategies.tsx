@@ -1,7 +1,8 @@
-import { View, Text, ScrollView, RefreshControl, Alert, StyleSheet } from "react-native";
+import { View, Text, FlatList, RefreshControl, Alert, StyleSheet } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useState, useEffect, useCallback } from "react";
-import type { StrategyInfo } from "../../src/types";
-import { strategies as api } from "../../src/api/endpoints";
+import type { StrategyInfo } from "@quant/shared";
+import { strategies as api } from "@quant/shared";
 import { StrategyRow } from "../../src/components/StrategyRow";
 
 export default function StrategiesScreen() {
@@ -41,31 +42,28 @@ export default function StrategiesScreen() {
   );
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#3B82F6" />
-      }
-    >
-      <Text style={styles.header}>
-        {items.filter((s) => s.status === "running").length} of {items.length} running
-      </Text>
-
-      {items.map((s) => (
-        <StrategyRow key={s.name} strategy={s} onToggle={handleToggle} />
-      ))}
-
-      {items.length === 0 && (
-        <Text style={styles.empty}>No strategies registered</Text>
-      )}
-
-      <View style={{ height: 24 }} />
-    </ScrollView>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <FlatList
+        data={items}
+        keyExtractor={(item) => item.name}
+        renderItem={({ item }) => <StrategyRow strategy={item} onToggle={handleToggle} />}
+        refreshControl={
+          <RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#3B82F6" />
+        }
+        ListHeaderComponent={
+          <Text style={styles.header}>
+            {items.filter((s) => s.status === "running").length} of {items.length} running
+          </Text>
+        }
+        ListEmptyComponent={<Text style={styles.empty}>No strategies registered</Text>}
+        contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0F172A", padding: 16 },
+  container: { flex: 1, backgroundColor: "#0F172A" },
   header: { color: "#94A3B8", fontSize: 13, marginBottom: 16 },
   empty: { color: "#64748B", fontSize: 14, textAlign: "center", padding: 24 },
 });

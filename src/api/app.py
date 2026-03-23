@@ -6,19 +6,31 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
-from src.api.routes import backtest, orders, portfolio, risk, strategies, system
+from src.api.auth import verify_ws_token
+from src.api.middleware import AuditMiddleware
+from src.api.routes import auth, backtest, orders, portfolio, risk, strategies, system
 from src.api.ws import ws_manager
 from src.config import get_config
+from src.logging_config import setup_logging
 
 logger = logging.getLogger(__name__)
+
+# Rate limiter（全域）
+limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
 
 
 def create_app() -> FastAPI:
     """建立 FastAPI 應用。"""
     config = get_config()
+
+    # 初始化 structured logging
+    setup_logging(config.log_level, config.log_format)
 
     app = FastAPI(
         title="Quant Trading System",
@@ -28,16 +40,24 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
     )
 
-    # CORS — 允許前端跨域存取
+    # Rate limiter
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+    # Audit logging middleware
+    app.add_middleware(AuditMiddleware)
+
+    # CORS — 從配置讀取允許的來源
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # 生產環境應限縮
+        allow_origins=config.allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
 
     # 註冊路由
+    app.include_router(auth.router, prefix="/api/v1")
     app.include_router(portfolio.router, prefix="/api/v1")
     app.include_router(strategies.router, prefix="/api/v1")
     app.include_router(orders.router, prefix="/api/v1")
@@ -45,35 +65,59 @@ def create_app() -> FastAPI:
     app.include_router(risk.router, prefix="/api/v1")
     app.include_router(system.router, prefix="/api/v1")
 
-    # WebSocket 端點
+    # WebSocket 端點（需要 token 認證）
     @app.websocket("/ws/{channel}")
-    async def websocket_endpoint(websocket: WebSocket, channel: str):
-        """WebSocket 連線端點。支持頻道：portfolio, alerts, orders"""
+    async def websocket_endpoint(
+        websocket: WebSocket,
+        channel: str,
+        token: str | None = Query(default=None),
+    ):
+        """WebSocket 連線端點。支持頻道：portfolio, alerts, orders, market"""
         valid_channels = {"portfolio", "alerts", "orders", "market"}
         if channel not in valid_channels:
             await websocket.close(code=4000, reason=f"Invalid channel: {channel}")
             return
 
+        # 認證：dev 模式下 token 可選，其他模式必須提供
+        if config.env != "dev":
+            if not token:
+                await websocket.close(code=4001, reason="Missing authentication token")
+                return
+            payload = verify_ws_token(token)
+            if payload is None:
+                await websocket.close(code=4001, reason="Invalid authentication token")
+                return
+
         await ws_manager.connect(websocket, channel)
         try:
             while True:
                 data = await websocket.receive_text()
-                # 處理客戶端訊息（目前只用於 keepalive）
                 if data == "ping":
                     await websocket.send_text("pong")
         except WebSocketDisconnect:
+            pass
+        except Exception:
+            logger.debug("WS error on channel=%s", channel, exc_info=True)
+        finally:
             ws_manager.disconnect(websocket, channel)
 
     @app.on_event("startup")
     async def startup():
-        logger.info("Quant Trading System starting (mode=%s)", config.mode)
-        # 初始化策略列表
+        logger.info(
+            "Quant Trading System starting (env=%s, mode=%s)",
+            config.env, config.mode,
+        )
         from src.api.state import get_app_state
         state = get_app_state()
         state.strategies = {
             "momentum_12_1": {"status": "stopped", "pnl": 0.0},
             "mean_reversion": {"status": "stopped", "pnl": 0.0},
         }
+
+    @app.on_event("shutdown")
+    async def shutdown():
+        logger.info("Quant Trading System shutting down...")
+        await ws_manager.close_all()
 
     return app
 

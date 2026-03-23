@@ -1,11 +1,11 @@
 import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard, Briefcase, Brain, FlaskConical,
-  ShieldAlert, Settings, ListOrdered,
+  ShieldAlert, Settings, ListOrdered, LogOut,
 } from "lucide-react";
 import { useT } from "@core/i18n";
 
-export function Sidebar() {
+export function Sidebar({ onLogout }: { onLogout?: () => void }) {
   const { t } = useT();
 
   const links = [
@@ -43,6 +43,17 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
+      {onLogout && (
+        <div className="px-3 pb-4 border-t border-surface-light pt-3">
+          <button
+            onClick={onLogout}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:text-red-400 hover:bg-surface transition-colors w-full"
+          >
+            <LogOut size={18} />
+            Logout
+          </button>
+        </div>
+      )}
     </aside>
   );
 }

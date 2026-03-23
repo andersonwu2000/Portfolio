@@ -1,5 +1,5 @@
 import { View, Text, Pressable, StyleSheet } from "react-native";
-import type { StrategyInfo } from "../types";
+import type { StrategyInfo } from "@quant/shared";
 import { fmtCurrency, pnlColor } from "../utils/format";
 
 interface Props {

@@ -6,8 +6,10 @@
 
 from __future__ import annotations
 
+import threading
 from typing import Literal
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,6 +21,9 @@ class TradingConfig(BaseSettings):
         extra="ignore",
     )
 
+    # ── 環境 ──
+    env: Literal["dev", "staging", "prod"] = "dev"
+
     # ── 運行模式 ──
     mode: Literal["backtest", "paper", "live"] = "backtest"
 
@@ -27,6 +32,7 @@ class TradingConfig(BaseSettings):
 
     # ── 數據源 ──
     data_source: Literal["yahoo", "fubon", "twse"] = "yahoo"
+    data_cache_dir: str = ".cache/market_data"
 
     # ── 風控 ──
     max_position_pct: float = 0.05
@@ -45,28 +51,44 @@ class TradingConfig(BaseSettings):
     # ── API ──
     api_host: str = "0.0.0.0"
     api_port: int = 8000
+    api_workers: int = 1
     api_key: str = "dev-key"
     jwt_secret: str = "change-me-in-production"
     jwt_expire_minutes: int = 1440          # 24 小時
+    allowed_origins: list[str] = ["http://localhost:3000"]
 
     # ── 日誌 ──
     log_level: str = "INFO"
     log_format: Literal["json", "text"] = "text"
 
-    # ── 回測預設 ──
+    # ── 回測 ──
     backtest_initial_cash: float = 10_000_000.0
     backtest_start: str = "2020-01-01"
     backtest_end: str = "2025-12-31"
+    backtest_timeout: int = 1800            # 秒
+
+    @model_validator(mode="after")
+    def _check_prod_secrets(self) -> "TradingConfig":
+        """Non-dev environments must not use default secrets."""
+        if self.env != "dev":
+            if self.api_key == "dev-key":
+                raise ValueError("QUANT_API_KEY must be set in non-dev environments (cannot use 'dev-key')")
+            if self.jwt_secret == "change-me-in-production":
+                raise ValueError("QUANT_JWT_SECRET must be set in non-dev environments")
+        return self
 
 
-# 全局單例
+# 全局單例（thread-safe）
 _config: TradingConfig | None = None
+_config_lock = threading.Lock()
 
 
 def get_config() -> TradingConfig:
     global _config
     if _config is None:
-        _config = TradingConfig()
+        with _config_lock:
+            if _config is None:
+                _config = TradingConfig()
     return _config
 
 

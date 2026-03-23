@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet } from "react-native";
-import type { RiskAlert } from "../types";
+import type { RiskAlert } from "@quant/shared";
 import { fmtTime } from "../utils/format";
 
 interface Props {

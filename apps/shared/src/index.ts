@@ -23,7 +23,7 @@ export { WSManager, initWs } from "./api/ws";
 export type { Channel } from "./api/ws";
 
 // Endpoints
-export { system, portfolio, strategies, orders, backtest, risk } from "./api/endpoints";
+export { auth, system, portfolio, strategies, orders, backtest, risk } from "./api/endpoints";
 
 // Utils
 export { fmtCurrency, fmtPct, fmtNum, fmtDate, fmtTime } from "./utils/format";

@@ -3,7 +3,7 @@ import { useApi } from "@core/hooks";
 import { fmtCurrency, pnlColor } from "@core/utils";
 import { StatusBadge, ErrorAlert, InfoTooltip } from "@shared/ui";
 import { useT } from "@core/i18n";
-import type { StrategyInfo } from "@core/types";
+import type { StrategyInfo } from "@quant/shared";
 import { Play, Square } from "lucide-react";
 import { strategiesApi } from "./api";
 

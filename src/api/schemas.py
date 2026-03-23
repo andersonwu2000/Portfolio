@@ -5,7 +5,7 @@ API 請求/回應模型 — Pydantic models → 自動生成 OpenAPI spec。
 from __future__ import annotations
 
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ─── 通用 ─────────────────────────────────────────
@@ -82,14 +82,29 @@ class ManualOrderRequest(BaseModel):
 
 class BacktestRequest(BaseModel):
     strategy: str
-    universe: list[str]
-    start: str = "2020-01-01"
-    end: str = "2025-12-31"
-    initial_cash: float = 10_000_000.0
+    universe: list[str] = Field(min_length=1)
+    start: str = Field(default="2020-01-01", pattern=r"^\d{4}-\d{2}-\d{2}$")
+    end: str = Field(default="2025-12-31", pattern=r"^\d{4}-\d{2}-\d{2}$")
+    initial_cash: float = Field(default=10_000_000.0, gt=0)
     params: dict = Field(default_factory=dict)
-    slippage_bps: float = 5.0
-    commission_rate: float = 0.001425
+    slippage_bps: float = Field(default=5.0, ge=0)
+    commission_rate: float = Field(default=0.001425, ge=0, le=1)
     rebalance_freq: str = "weekly"
+
+    @field_validator("strategy")
+    @classmethod
+    def strategy_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("strategy must not be empty")
+        return v.strip()
+
+    @field_validator("end")
+    @classmethod
+    def end_after_start(cls, v: str, info) -> str:
+        start = info.data.get("start", "")
+        if start and v <= start:
+            raise ValueError("end date must be after start date")
+        return v
 
 
 class BacktestSummaryResponse(BaseModel):
@@ -101,7 +116,9 @@ class BacktestSummaryResponse(BaseModel):
     sharpe: float | None = None
     max_drawdown: float | None = None
     total_trades: int | None = None
-    # 完整結果通過 /backtest/{id}/result 取得
+    progress_current: int | None = None
+    progress_total: int | None = None
+    error: str | None = None
 
 
 class BacktestResultResponse(BaseModel):

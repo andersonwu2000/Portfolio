@@ -1,6 +1,6 @@
 import { fmtCurrency, fmtPct, pnlColor } from "@core/utils";
 import { useT } from "@core/i18n";
-import type { Position } from "@core/types";
+import type { Position } from "@quant/shared";
 
 export function PositionTable({ positions }: { positions: Position[] }) {
   const { t } = useT();

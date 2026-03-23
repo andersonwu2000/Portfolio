@@ -1,5 +1,5 @@
 import { get, post } from "@core/api";
-import type { StrategyInfo } from "@core/types";
+import type { StrategyInfo } from "@quant/shared";
 
 export const strategiesApi = {
   list: () => get<{ strategies: StrategyInfo[] }>("/api/v1/strategies").then((r) => r.strategies),

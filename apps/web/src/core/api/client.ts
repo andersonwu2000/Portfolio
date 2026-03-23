@@ -1,33 +1,40 @@
 /**
  * Web platform adapter for @quant/shared client.
- * Stores API key in localStorage and uses browser-relative URLs.
+ * Uses httpOnly cookie for auth (set by /auth/login).
+ * Falls back to API key in localStorage for backward compatibility.
  */
 
-import { initClient, initWs } from "@quant/shared";
+import { initClient, initWs, post } from "@quant/shared";
 import type { Channel } from "@quant/shared";
 
-const API_KEY_STORAGE = "quant_api_key";
+const AUTH_STORAGE = "quant_authenticated";
 
-export function getApiKey(): string {
-  return localStorage.getItem(API_KEY_STORAGE) || "";
+export function isAuthenticated(): boolean {
+  return localStorage.getItem(AUTH_STORAGE) === "true";
 }
 
-export function setApiKey(key: string) {
-  localStorage.setItem(API_KEY_STORAGE, key);
+/** Login via backend JWT endpoint — sets httpOnly cookie automatically. */
+export async function login(apiKey: string): Promise<void> {
+  await post<{ access_token: string }>("/api/v1/auth/login", { api_key: apiKey });
+  localStorage.setItem(AUTH_STORAGE, "true");
 }
 
-export function clearApiKey() {
-  localStorage.removeItem(API_KEY_STORAGE);
+/** Logout — clears cookie and local flag. */
+export async function logout(): Promise<void> {
+  try {
+    await post("/api/v1/auth/logout", {});
+  } catch {
+    // best effort
+  }
+  localStorage.removeItem(AUTH_STORAGE);
 }
 
 // Initialize shared client with web adapter
 initClient({
   getBaseUrl: () => "",  // web uses Vite proxy, paths are relative
   getHeaders: async () => {
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    const apiKey = getApiKey();
-    if (apiKey) headers["X-API-Key"] = apiKey;
-    return headers;
+    return { "Content-Type": "application/json" };
+    // Auth is handled by httpOnly cookie (sent automatically by browser)
   },
 });
 

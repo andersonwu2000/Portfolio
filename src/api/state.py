@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import threading
 from dataclasses import dataclass, field
 from decimal import Decimal
 
@@ -22,15 +24,22 @@ class AppState:
     risk_engine: RiskEngine = field(default_factory=RiskEngine)
     strategies: dict[str, dict] = field(default_factory=dict)
     backtest_tasks: dict[str, dict] = field(default_factory=dict)
+    # 保護 portfolio mutation 的非同步鎖
+    mutation_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    # 保護 backtest_tasks 跨執行緒存取
+    backtest_lock: threading.Lock = field(default_factory=threading.Lock)
 
 
 _state: AppState | None = None
+_state_lock = threading.Lock()
 
 
 def get_app_state() -> AppState:
     global _state
     if _state is None:
-        _state = AppState()
+        with _state_lock:
+            if _state is None:
+                _state = AppState()
     return _state
 
 

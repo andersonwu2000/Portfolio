@@ -19,6 +19,9 @@ export interface BacktestSummary {
   sharpe: number | null;
   max_drawdown: number | null;
   total_trades: number | null;
+  progress_current: number | null;
+  progress_total: number | null;
+  error: string | null;
 }
 
 export interface BacktestResult {

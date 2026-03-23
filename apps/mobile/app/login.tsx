@@ -12,20 +12,20 @@ import {
 import { useAuth } from "../src/hooks/useAuth";
 
 export default function LoginScreen() {
-  const [serverUrl, setServerUrl] = useState("http://192.168.1.100:8000");
+  const [serverUrl, setServerUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const { login, loading, error } = useAuth();
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (serverUrl && apiKey) {
-      login(serverUrl, apiKey);
+      await login(serverUrl, apiKey);
     }
   };
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <View style={styles.inner}>
         <Text style={styles.title}>Quant Trading</Text>
@@ -36,12 +36,15 @@ export default function LoginScreen() {
           style={styles.input}
           value={serverUrl}
           onChangeText={setServerUrl}
-          placeholder="http://192.168.1.100:8000"
+          placeholder="https://your-server:8000"
           placeholderTextColor="#475569"
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="url"
         />
+        {serverUrl.startsWith("http://") && !serverUrl.includes("localhost") && !serverUrl.includes("127.0.0.1") && (
+          <Text style={styles.warning}>Insecure connection — use HTTPS in production</Text>
+        )}
 
         <Text style={styles.label}>API Key</Text>
         <TextInput
@@ -110,6 +113,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     borderWidth: 1,
     borderColor: "#334155",
+  },
+  warning: {
+    color: "#F59E0B",
+    fontSize: 12,
+    marginTop: 6,
   },
   error: {
     color: "#EF4444",

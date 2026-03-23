@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet } from "react-native";
-import type { Position } from "../types";
+import type { Position } from "@quant/shared";
 import { fmtCurrency, fmtPct, pnlColor } from "../utils/format";
 
 interface Props {

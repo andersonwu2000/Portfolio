@@ -5,8 +5,11 @@ Yahoo Finance 數據源 — 開發和研究用。
 from __future__ import annotations
 
 import logging
+import os
+import time
 from datetime import datetime
 from decimal import Decimal
+from pathlib import Path
 
 import pandas as pd
 import yfinance as yf
@@ -15,6 +18,9 @@ from src.data.feed import DataFeed
 from src.data.quality import check_bars
 
 logger = logging.getLogger(__name__)
+
+# 快取 TTL（秒），預設 24 小時
+_CACHE_TTL = 86400
 
 
 class YahooFeed(DataFeed):
@@ -40,6 +46,14 @@ class YahooFeed(DataFeed):
 
         if cache_key not in self._cache:
             self._cache[cache_key] = self._download(symbol, start, end, freq)
+        else:
+            # Ensure cached data covers requested range; re-download if not
+            cached = self._cache[cache_key]
+            if not cached.empty:
+                if start is not None and pd.Timestamp(start) < cached.index.min():
+                    self._cache[cache_key] = self._download(symbol, start, end, freq)
+                if end is not None and pd.Timestamp(end) > cached.index.max():
+                    self._cache[cache_key] = self._download(symbol, start, end, freq)
 
         df = self._cache[cache_key]
 
@@ -57,7 +71,13 @@ class YahooFeed(DataFeed):
         end: datetime | str | None,
         freq: str,
     ) -> pd.DataFrame:
-        """從 Yahoo Finance 下載數據。"""
+        """從 Yahoo Finance 下載數據（優先使用本地快取）。"""
+        # 嘗試從快取讀取
+        cached = self._load_cache(symbol, freq)
+        if cached is not None:
+            logger.info("Cache hit for %s (freq=%s)", symbol, freq)
+            return cached
+
         interval_map = {"1d": "1d", "1h": "1h", "5m": "5m", "1m": "1m"}
         interval = interval_map.get(freq, "1d")
 
@@ -65,10 +85,12 @@ class YahooFeed(DataFeed):
 
         try:
             ticker = yf.Ticker(symbol)
+            # auto_adjust=True: close 已含除權除息調整，回測用調整後價格
             df = ticker.history(
                 start=str(start) if start else "2015-01-01",
                 end=str(end) if end else None,
                 interval=interval,
+                auto_adjust=True,
             )
         except Exception as e:
             logger.error("Failed to download %s: %s", symbol, e)
@@ -96,7 +118,42 @@ class YahooFeed(DataFeed):
         # 去除 NaN 行
         df = df.dropna()
 
+        # 寫入快取
+        self._save_cache(symbol, freq, df)
+
         return df
+
+    def _cache_path(self, symbol: str, freq: str) -> Path:
+        from src.config import get_config
+        cache_dir = Path(get_config().data_cache_dir)
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        # Sanitize symbol to prevent path traversal
+        safe_symbol = symbol.replace("/", "_").replace("\\", "_").replace("..", "_")
+        path = (cache_dir / f"{safe_symbol}_{freq}.parquet").resolve()
+        if not str(path).startswith(str(cache_dir.resolve())):
+            raise ValueError(f"Invalid symbol for cache path: {symbol}")
+        return path
+
+    def _load_cache(self, symbol: str, freq: str) -> pd.DataFrame | None:
+        path = self._cache_path(symbol, freq)
+        if not path.exists():
+            return None
+        age = time.time() - path.stat().st_mtime
+        if age > _CACHE_TTL:
+            return None
+        try:
+            return pd.read_parquet(path)
+        except Exception:
+            return None
+
+    def _save_cache(self, symbol: str, freq: str, df: pd.DataFrame) -> None:
+        if df.empty:
+            return
+        try:
+            path = self._cache_path(symbol, freq)
+            df.to_parquet(path)
+        except Exception as e:
+            logger.debug("Failed to cache %s: %s", symbol, e)
 
     def get_latest_price(self, symbol: str) -> Decimal:
         df = self.get_bars(symbol)

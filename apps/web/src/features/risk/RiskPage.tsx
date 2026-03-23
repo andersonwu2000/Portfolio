@@ -27,6 +27,7 @@ export function RiskPage() {
   const { data: rules, error: rulesError, refresh: refreshRules } = useApi<RiskRule[]>(riskApi.rules);
   const { data: alerts, error: alertsError, refresh: refreshAlerts, setData: setAlerts } = useApi<RiskAlert[]>(riskApi.alerts);
   const [killMsg, setKillMsg] = useState<string | null>(null);
+  const [killLoading, setKillLoading] = useState(false);
   const [toggling, setToggling] = useState<string | null>(null);
 
   useWs("alerts", useCallback((msg: unknown) => {
@@ -50,11 +51,14 @@ export function RiskPage() {
 
   const handleKill = async () => {
     if (!confirm(t.risk.killConfirm)) return;
+    setKillLoading(true);
     try {
       const resp = await riskApi.killSwitch();
       setKillMsg(resp.detail);
     } catch (err) {
       setKillMsg(err instanceof Error ? err.message : "Kill switch failed");
+    } finally {
+      setKillLoading(false);
     }
   };
 
@@ -63,8 +67,9 @@ export function RiskPage() {
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold">{t.risk.title}</h2>
         <button onClick={handleKill}
-          className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-sm font-medium transition-colors">
-          <ShieldOff size={16} /> {t.risk.killSwitch}
+          disabled={killLoading}
+          className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors">
+          <ShieldOff size={16} /> {killLoading ? "..." : t.risk.killSwitch}
         </button>
       </div>
 

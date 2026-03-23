@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { useState, useCallback, useMemo } from "react";
 import { Sidebar } from "@shared/layout";
 import { DashboardPage } from "@feat/dashboard";
@@ -8,11 +8,11 @@ import { OrdersPage } from "@feat/orders";
 import { BacktestPage } from "@feat/backtest";
 import { RiskPage } from "@feat/risk";
 import { SettingsPage } from "@feat/settings";
-import { getApiKey } from "@core/api";
+import { isAuthenticated, logout } from "@core/api";
 import { I18nContext, getSavedLang, saveLang, translations, type Lang } from "@core/i18n";
 
 function RequireKey({ children }: { children: React.ReactNode }) {
-  if (!getApiKey()) return <Navigate to="/settings" replace />;
+  if (!isAuthenticated()) return <Navigate to="/settings" replace />;
   return <>{children}</>;
 }
 
@@ -25,6 +25,11 @@ export default function App() {
     setLangState(l);
   }, []);
 
+  const handleLogout = useCallback(async () => {
+    await logout();
+    refresh((n) => n + 1);
+  }, []);
+
   const i18nValue = useMemo(() => ({
     t: translations[lang], lang, setLang,
   }), [lang, setLang]);
@@ -32,7 +37,7 @@ export default function App() {
   return (
     <I18nContext.Provider value={i18nValue}>
       <div className="flex min-h-screen bg-surface-dark text-slate-100">
-        <Sidebar />
+        <Sidebar onLogout={isAuthenticated() ? handleLogout : undefined} />
         <main className="flex-1 p-6 overflow-auto">
           <Routes>
             <Route path="/settings" element={<SettingsPage onSave={() => refresh((n) => n + 1)} />} />

@@ -11,6 +11,20 @@
 - REST API + WebSocket 即時監控
 - CLI 命令列工具：回測、因子分析、系統管理
 
+### 什麼是回測
+
+回測（Backtest）是用歷史數據模擬一套交易策略的過程，目的是在投入真金白銀之前，先了解這套策略在過去的表現如何。
+
+本系統的回測流程每天重複以下步驟：
+
+1. **取得歷史資料** — 從 Yahoo Finance 自動下載股票的開高低收、成交量等數據
+2. **策略運算** — 你的策略根據歷史資料，決定「我想持有哪些股票、各佔多少比例」
+3. **風控檢查** — 系統自動檢查這些持倉是否符合風控規則（例如單檔不超過 10%）
+4. **模擬交易** — 系統模擬真實下單，包含手續費、滑價、證交稅等成本
+5. **更新持倉與淨值** — 記錄每天的資產淨值，最後計算績效指標
+
+你只需要負責第 2 步：告訴系統你想怎麼分配資金。其他的事系統會幫你處理。
+
 ## 2. 安裝
 
 ### 環境需求
@@ -53,32 +67,49 @@ make migrate
 
 ## 3. 快速上手
 
-### 執行回測
+### 執行你的第一次回測
 
 ```bash
-# 動量策略，美國科技股，週再平衡
 python -m src.cli.main backtest \
     --strategy momentum \
-    -u AAPL -u MSFT -u GOOGL -u AMZN -u META \
+    -u AAPL -u MSFT -u GOOGL \
     --start 2023-01-01 \
-    --end 2024-12-31 \
-    --rebalance weekly \
-    --validate
+    --end 2024-12-31
 ```
 
-**參數說明：**
+這會做以下事情：
+- 從 Yahoo Finance 下載 AAPL、MSFT、GOOGL 三檔股票在 2023-01-01 到 2024-12-31 間的歷史數據
+- 使用「動量策略」：買入近期表現最強的股票
+- 以 1,000 萬元初始資金、每週再平衡的方式模擬交易
+- 計算完成後，輸出完整的績效報告
+
+### 台股範例
+
+系統預設的手續費和證交稅就是台灣的費率。台股在 Yahoo Finance 的代碼格式為 `代號.TW`：
+
+```bash
+python -m src.cli.main backtest \
+    -s momentum \
+    -u 2330.TW -u 2317.TW -u 2454.TW \
+    --start 2023-01-01 \
+    --end 2024-12-31
+```
+
+這會回測台積電（2330）、鴻海（2317）、聯發科（2454）的動量策略組合。
+
+### CLI 參數
 
 | 參數 | 簡寫 | 預設值 | 說明 |
 |------|------|--------|------|
-| `--strategy` | `-s` | `momentum` | 策略名稱 |
-| `--universe` | `-u` | AAPL, MSFT, GOOGL, AMZN, META | 股票代碼（可重複指定） |
-| `--start` | | `2020-01-01` | 開始日期 |
-| `--end` | | `2024-12-31` | 結束日期 |
-| `--cash` | `-c` | `10000000` | 初始資金 |
-| `--rebalance` | `-r` | `weekly` | 再平衡頻率：`daily`（每日）、`weekly`（每週）、`monthly`（每月） |
-| `--slippage` | | `5.0` | 滑價（基點） |
-| `--validate` | `-v` | `False` | 是否執行回測驗證 |
-| `--log-level` | `-l` | `INFO` | 日誌等級 |
+| `--strategy` | `-s` | `momentum` | 策略名稱（`momentum` 或 `mean_reversion`） |
+| `--universe` | `-u` | AAPL, MSFT, GOOGL, AMZN, META | 股票代碼，可重複指定多檔 |
+| `--start` | | `2020-01-01` | 回測起始日 |
+| `--end` | | `2024-12-31` | 回測結束日 |
+| `--cash` | `-c` | `10,000,000` | 初始資金 |
+| `--rebalance` | `-r` | `weekly` | 再平衡頻率：`daily`（每天）、`weekly`（每週一）、`monthly`（每月初） |
+| `--slippage` | | `5.0` | 滑價，單位為基點（1 基點 = 0.01%） |
+| `--validate` | `-v` | 關閉 | 啟用結果驗證 |
+| `--log-level` | `-l` | `INFO` | 日誌等級（`DEBUG` 可看到更多細節） |
 
 ### 輸出範例
 
@@ -103,43 +134,304 @@ Win Rate:      64.7%
 Total Comm.:   $25,962
 ```
 
-### 查看因子值
+### 範例：不同配置的比較
 
 ```bash
-python -m src.cli.main factors AAPL
+# 每日再平衡、更高滑價假設
+python -m src.cli.main backtest \
+    -s momentum -u AAPL -u MSFT -u GOOGL \
+    --start 2023-01-01 --end 2024-12-31 \
+    --rebalance daily --slippage 10
+
+# 均值回歸策略、每月再平衡、較少初始資金
+python -m src.cli.main backtest \
+    -s mean_reversion -u AAPL -u MSFT -u GOOGL -u AMZN -u META \
+    --start 2022-01-01 --end 2024-12-31 \
+    --rebalance monthly --cash 1000000
 ```
 
-顯示指定股票的當前因子值：動量、均值回歸（Z 分數）、波動率、RSI 及均線交叉。
+## 4. 看懂回測結果
 
-### 查看系統狀態
+| 指標 | 說明 | 怎樣算好？ |
+|------|------|-----------|
+| **Total Return** | 整個回測期間賺了多少 | 正值就是賺錢 |
+| **Annual Return** | 年化報酬率 | 長期而言 > 8% 算不錯 |
+| **Volatility** | 波動率 — 報酬的不確定程度 | 越低越穩定 |
+| **Sharpe Ratio** | 每承受一單位風險，賺到多少報酬 | > 1.0 算好，> 2.0 很好 |
+| **Sortino Ratio** | 類似 Sharpe，但只考慮下跌風險 | > 1.0 算好 |
+| **Calmar Ratio** | 年化報酬 / 最大回撤 | > 1.0 算好 |
+| **Max Drawdown** | 從最高點到最低點，最多跌了多少 | 越小越好，< 10% 算穩健 |
+| **Max DD Days** | 最大回撤持續了幾天 | 越短表示回復越快 |
+| **Win Rate** | 盈利交易的比例 | > 50% 但不是唯一指標 |
+| **Total Comm.** | 總交易成本（手續費 + 稅） | 注意成本是否侵蝕獲利 |
+| **換手率（Turnover）** | 年化投資組合換手率 | 越低代表交易成本越少 |
+
+### 回測驗證
+
+啟用 `--validate` 時，系統會執行以下檢查：
+
+- **非零交易：** 至少執行 1 筆交易
+- **NAV 連續性：** 單日 NAV 變動未超過合理閾值
+- **報酬合理性：** 年化報酬在可信範圍內
+- **Sharpe 合理性：** Sharpe 比率在可信範圍內
+- **成本影響：** 交易成本相對於報酬是合理的
+
+## 5. 內建策略
+
+### 動量策略（momentum）
+
+**核心概念**：過去漲得多的股票，未來可能繼續漲。
+
+具體做法：
+- 計算每檔股票過去 252 個交易日（約 12 個月）的報酬率，但跳過最近 21 天（約 1 個月），因為短期內可能有反轉
+- 選出報酬最高的前 10 檔
+- 按報酬率的強弱分配權重，單檔上限 10%，總持倉不超過 95%
 
 ```bash
-python -m src.cli.main status
+python -m src.cli.main backtest -s momentum -u AAPL -u MSFT -u GOOGL -u AMZN -u META
 ```
 
-顯示當前配置：運行模式、數據源、API 端點、手續費率及風控限制。
+**策略名稱：** `momentum` 或 `momentum_12_1`
 
-## 4. 內建策略
+### 均值回歸策略（mean_reversion）
 
-### 動量策略（12-1）
+**核心概念**：股價偏離均線太遠時，傾向回歸。
 
-經典的橫截面動量策略。
+具體做法：
+- 計算每檔股票的 Z-score：目前價格偏離 20 日均線多少個標準差
+- 只買入 Z-score 超過 1.5 的標的（也就是價格顯著低於均線的）
+- 按 Z-score 強弱分配權重，單檔上限 8%，總持倉不超過 90%
 
-- **邏輯：** 買入過去 12 個月漲幅最大的股票，跳過最近 1 個月（避免短期反轉效應）。
-- **參數：** `lookback=252`、`skip=21`、`max_holdings=10`
-- **配置方式：** 信號加權，單檔上限 10%，總曝險 95%。
-- **策略名稱：** `momentum` 或 `momentum_12_1`
+```bash
+python -m src.cli.main backtest -s mean_reversion -u AAPL -u MSFT -u GOOGL -u AMZN -u META
+```
 
-### 均值回歸策略
+## 6. 撰寫你自己的策略
 
-統計型均值回歸策略。
+撰寫策略只需要三步：
 
-- **邏輯：** 買入價格顯著偏離 20 日均線下方的股票（Z 分數 > 1.5 個標準差）。
-- **參數：** `lookback=20`、`z_threshold=1.5`
-- **配置方式：** 信號加權，單檔上限 8%，總曝險 90%，僅做多。
-- **策略名稱：** `mean_reversion`
+### Step 1：建立策略檔案
 
-## 5. 啟動 API 伺服器
+在 `strategies/` 目錄下新增一個 Python 檔案，例如 `strategies/my_strategy.py`：
+
+```python
+from src.strategy.base import Context, Strategy
+
+
+class MyStrategy(Strategy):
+
+    def name(self) -> str:
+        return "my_strategy"
+
+    def on_bar(self, ctx: Context) -> dict[str, float]:
+        """
+        這是策略的核心：根據當前數據，回傳你想持有的股票和比例。
+
+        回傳格式：{"股票代碼": 權重, ...}
+        權重代表佔總資產的比例，例如 0.2 = 20%
+        沒出現在 dict 裡的股票 = 不持有（如果之前有持倉會自動賣出）
+        """
+        weights = {}
+
+        for symbol in ctx.universe():
+            bars = ctx.bars(symbol, lookback=50)
+            if len(bars) < 50:
+                continue
+
+            close = bars["close"]
+
+            # 範例邏輯：如果目前價格高於 50 日均線，就買入
+            if close.iloc[-1] > close.mean():
+                weights[symbol] = 0.2  # 配置 20%
+
+        return weights
+```
+
+`ctx`（Context）是你與系統互動的唯一介面，它提供：
+
+| 方法 | 說明 |
+|------|------|
+| `ctx.universe()` | 取得所有可交易的股票代碼 |
+| `ctx.bars(symbol, lookback=252)` | 取得歷史 K 線（包含 open、high、low、close、volume） |
+| `ctx.portfolio()` | 取得目前的持倉資訊 |
+| `ctx.now()` | 取得當前日期 |
+| `ctx.latest_price(symbol)` | 取得最新收盤價 |
+| `ctx.log(msg)` | 輸出日誌 |
+
+回測時 `ctx.bars()` 會自動截斷未來的數據，確保你的策略不會「偷看」到未來的資訊。
+
+### Step 2：註冊策略
+
+打開 `src/cli/main.py`，找到 `_resolve_strategy` 函式，加入你的策略：
+
+```python
+def _resolve_strategy(name: str):
+    from strategies.momentum import MomentumStrategy
+    from strategies.mean_reversion import MeanReversionStrategy
+    from strategies.my_strategy import MyStrategy  # 加這行
+
+    mapping = {
+        "momentum": MomentumStrategy,
+        "momentum_12_1": MomentumStrategy,
+        "mean_reversion": MeanReversionStrategy,
+        "my_strategy": MyStrategy,                  # 加這行
+    }
+    # ...
+```
+
+### Step 3：執行回測
+
+```bash
+python -m src.cli.main backtest -s my_strategy -u AAPL -u MSFT -u GOOGL --start 2023-01-01 --end 2024-12-31
+```
+
+### 更多策略範例
+
+**RSI 超賣策略**：RSI 低於 30 時買入
+
+```python
+from src.strategy.base import Context, Strategy
+from src.strategy.factors import rsi
+
+
+class RSIStrategy(Strategy):
+
+    def name(self) -> str:
+        return "rsi_oversold"
+
+    def on_bar(self, ctx: Context) -> dict[str, float]:
+        weights = {}
+
+        for symbol in ctx.universe():
+            bars = ctx.bars(symbol, lookback=30)
+            if len(bars) < 15:
+                continue
+
+            factor = rsi(bars, period=14)
+            if not factor.empty and factor["rsi"] < 30:
+                weights[symbol] = 0.1
+
+        return weights
+```
+
+**雙均線交叉策略**：短期均線突破長期均線時買入
+
+```python
+from src.strategy.base import Context, Strategy
+from src.strategy.factors import moving_average_crossover
+
+
+class MACrossStrategy(Strategy):
+
+    def name(self) -> str:
+        return "ma_cross"
+
+    def on_bar(self, ctx: Context) -> dict[str, float]:
+        weights = {}
+
+        for symbol in ctx.universe():
+            bars = ctx.bars(symbol, lookback=60)
+            if len(bars) < 50:
+                continue
+
+            factor = moving_average_crossover(bars, fast=10, slow=50)
+            if not factor.empty and factor["ma_cross"] > 0:
+                weights[symbol] = 0.15
+
+        return weights
+```
+
+## 7. 因子庫與優化器
+
+### 因子庫
+
+系統內建了多個技術因子，可以直接在策略中使用。它們都在 `src/strategy/factors.py` 裡：
+
+| 因子 | 函式 | 主要參數 | 回傳值 |
+|------|------|----------|--------|
+| 動量 | `momentum(bars, lookback=252, skip=21)` | 回溯天數、跳過天數 | `{"momentum": float}` |
+| 均值回歸 | `mean_reversion(bars, lookback=20)` | 回溯天數 | `{"z_score": float}` |
+| 波動率 | `volatility(bars, lookback=20)` | 回溯天數 | `{"volatility": float}` |
+| RSI | `rsi(bars, period=14)` | 計算週期 | `{"rsi": float}` |
+| 均線交叉 | `moving_average_crossover(bars, fast=10, slow=50)` | 快線/慢線週期 | `{"ma_cross": float}` |
+| 量價趨勢 | `volume_price_trend(bars, lookback=20)` | 回溯天數 | `{"vpt": float}` |
+
+使用方式：
+
+```python
+from src.strategy.factors import momentum, rsi, volatility
+
+factor = momentum(bars, lookback=252, skip=21)
+if not factor.empty:
+    signal = factor["momentum"]  # 取出數值
+```
+
+### 優化器
+
+當你有了每檔股票的信號後，需要決定「信號要怎麼轉換成權重」。系統提供三種優化器（`src/strategy/optimizer.py`）：
+
+| 優化器 | 函式 | 說明 |
+|--------|------|------|
+| 等權重 | `equal_weight(signals, constraints)` | 所有有信號的標的平均分配 |
+| 信號加權 | `signal_weight(signals, constraints)` | 信號越強，權重越高 |
+| 風險平價 | `risk_parity(signals, volatilities, constraints)` | 讓每檔股票貢獻相等的風險 |
+
+搭配 `OptConstraints` 控制約束條件：
+
+```python
+from src.strategy.optimizer import signal_weight, OptConstraints
+
+weights = signal_weight(
+    signals={"AAPL": 0.8, "MSFT": 0.5, "GOOGL": 0.3},
+    constraints=OptConstraints(
+        max_weight=0.10,         # 單檔最多 10%
+        max_total_weight=0.95,   # 總持倉最多 95%（留 5% 現金）
+        long_only=True,          # 只做多
+    ),
+)
+```
+
+### 完整範例：結合因子與優化器
+
+```python
+from src.strategy.base import Context, Strategy
+from src.strategy.factors import momentum, volatility
+from src.strategy.optimizer import risk_parity, OptConstraints
+
+
+class MomentumRiskParity(Strategy):
+    """動量選股 + 風險平價配置"""
+
+    def name(self) -> str:
+        return "momentum_rp"
+
+    def on_bar(self, ctx: Context) -> dict[str, float]:
+        signals = {}
+        vols = {}
+
+        for symbol in ctx.universe():
+            bars = ctx.bars(symbol, lookback=280)
+            if len(bars) < 252:
+                continue
+
+            mom = momentum(bars)
+            vol = volatility(bars)
+
+            if not mom.empty and not vol.empty and mom["momentum"] > 0:
+                signals[symbol] = mom["momentum"]
+                vols[symbol] = vol["volatility"]
+
+        if not signals:
+            return {}
+
+        return risk_parity(
+            signals=signals,
+            volatilities=vols,
+            constraints=OptConstraints(max_weight=0.15, max_total_weight=0.90),
+        )
+```
+
+## 8. 啟動 API 伺服器
 
 ```bash
 # 開發模式（含熱重載）
@@ -165,7 +457,7 @@ python -m src.cli.main server --host 0.0.0.0 --port 8000
 curl -H "X-API-Key: dev-key" http://localhost:8000/api/v1/system/status
 ```
 
-## 6. 風控管理
+## 9. 風控管理
 
 系統在每筆訂單執行前強制執行以下風控規則：
 
@@ -180,47 +472,7 @@ curl -H "X-API-Key: dev-key" http://localhost:8000/api/v1/system/status
 
 **緊急熔斷：** 日回撤達 5% 時自動觸發 — 取消所有掛單並停止所有策略。
 
-## 7. 績效指標
-
-回測引擎計算以下績效指標：
-
-| 指標 | 說明 |
-|------|------|
-| 總報酬（Total Return） | 回測期間的累積報酬 |
-| 年化報酬（Annual Return） | 年化報酬率（假設每年 252 個交易日） |
-| Sharpe Ratio | 風險調整後報酬（年化報酬 / 波動率） |
-| Sortino Ratio | 下行風險調整後報酬 |
-| Calmar Ratio | 年化報酬 / 最大回撤 |
-| 最大回撤（Max Drawdown） | 最大峰谷跌幅 |
-| 最大回撤天數 | 最長回撤持續天數 |
-| 波動率（Volatility） | 日報酬的年化標準差 |
-| 勝率（Win Rate） | 盈利交易佔比 |
-| 換手率（Turnover） | 年化投資組合換手率 |
-
-### 回測驗證
-
-啟用 `--validate` 時，系統會執行以下檢查：
-
-- **非零交易：** 至少執行 1 筆交易
-- **NAV 連續性：** 單日 NAV 變動未超過合理閾值
-- **報酬合理性：** 年化報酬在可信範圍內
-- **Sharpe 合理性：** Sharpe 比率在可信範圍內
-- **成本影響：** 交易成本相對於報酬是合理的
-
-## 8. 因子庫
-
-可用於策略開發的技術因子：
-
-| 因子 | 函式 | 主要參數 | 輸出 |
-|------|------|----------|------|
-| 動量 | `momentum()` | `lookback=252, skip=21` | 12-1 月報酬比率 |
-| 均值回歸 | `mean_reversion()` | `lookback=20` | Z 分數（反轉：低值 = 買入訊號） |
-| 波動率 | `volatility()` | `lookback=20` | 年化波動率 |
-| RSI | `rsi()` | `period=14` | 相對強弱指標（0-100） |
-| 均線交叉 | `moving_average_crossover()` | `fast=10, slow=50` | 快線/慢線比值 - 1 |
-| 量價趨勢 | `volume_price_trend()` | `lookback=20` | 價格與成交量相關性 |
-
-## 9. 交易成本模型
+## 10. 交易成本模型
 
 模擬引擎預設使用台灣股票市場的成本參數：
 
@@ -231,3 +483,55 @@ curl -H "X-API-Key: dev-key" http://localhost:8000/api/v1/system/status
 | 滑價 | 5 基點 | 買入價格上調，賣出價格下調 |
 
 所有成本參數均可透過 CLI 參數或環境變數自訂。
+
+## 11. 其他實用指令
+
+### 查看系統狀態
+
+```bash
+python -m src.cli.main status
+```
+
+顯示目前的運行模式、資料來源、手續費率、風控限制等配置。
+
+### 查看個股因子
+
+```bash
+python -m src.cli.main factors AAPL
+python -m src.cli.main factors 2330.TW
+```
+
+顯示指定股票的各項技術因子數值，可以幫助你判斷策略邏輯是否合理。
+
+### 使用 Makefile
+
+```bash
+# 執行回測（用 ARGS 傳入參數）
+make backtest ARGS="-s momentum -u AAPL -u MSFT --start 2023-01-01 --end 2024-12-31"
+
+# 啟動 API 伺服器（開發模式）
+make dev
+
+# 執行測試
+make test
+```
+
+## 12. 常見問題
+
+### 下載數據時出錯？
+
+系統透過 Yahoo Finance 取得數據，需要網路連線。如果下載失敗，請確認：
+- 網路是否正常
+- 股票代碼是否正確（台股要加 `.TW`）
+- Yahoo Finance 是否能存取（部分地區可能需要 VPN）
+
+### 回測結果沒有交易？
+
+可能原因：
+- 回測期間太短，策略需要足夠的歷史資料來運算（例如動量策略需要至少 252 天）
+- 策略的條件太嚴格，沒有任何標的符合
+- 可以加 `--log-level DEBUG` 查看詳細日誌
+
+### 怎麼比較不同策略的好壞？
+
+用相同的標的、相同的時間區間、相同的初始資金分別跑兩個策略，比較 Sharpe Ratio 和 Max Drawdown。Sharpe 越高代表風險調整後報酬越好，Max Drawdown 越低代表承受的最大損失越小。

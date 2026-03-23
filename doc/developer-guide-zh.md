@@ -25,6 +25,22 @@
 - 時間因果性在 Context 層強制執行（回測數據截斷至當前模擬時間）
 - 全系統統一使用 tz-naive UTC（所有 DatetimeIndex 在載入時即正規化）
 
+### 技術棧
+
+| 類別 | 技術 |
+|------|------|
+| 語言/執行 | Python 3.12+ |
+| API 框架 | FastAPI 0.110+、Uvicorn 0.27+、WebSockets |
+| 資料處理 | Pandas 2.0+、NumPy 1.26+、yfinance |
+| 資料庫 | PostgreSQL、SQLAlchemy 2.0+、Alembic |
+| 最佳化 | cvxpy 1.4+、scipy 1.12+ |
+| 認證 | JWT（python-jose）、API Key |
+| CLI | Typer + Rich |
+| 測試 | pytest 8.0+、pytest-asyncio、httpx |
+| Web 前端 | React 18 + Vite + Tailwind CSS |
+| Mobile 前端 | React Native 0.76 + Expo 52 + Expo Router 4 |
+| 前端共享 | `@quant/shared`（TypeScript 型別、API client、WS manager） |
+
 ## 2. 專案結構
 
 ```
@@ -33,9 +49,9 @@ src/
 ├── config.py             # Pydantic Settings，QUANT_ 前綴環境變數
 ├── data/
 │   ├── feed.py           # DataFeed ABC + HistoricalFeed
-│   ├── store.py          # SQLite/PostgreSQL 持久化
+│   ├── store.py          # SQLAlchemy Core 持久化（SQLite/PostgreSQL）
 │   ├── quality.py        # 數據驗證（欄位、NaN、異常值）
-│   └── sources/yahoo.py  # Yahoo Finance 連接器
+│   └── sources/yahoo.py  # Yahoo Finance 連接器（含 parquet 快取）
 ├── strategy/
 │   ├── base.py           # Strategy ABC + Context
 │   ├── engine.py         # weights_to_orders() 權重轉訂單
@@ -66,6 +82,17 @@ strategies/               # 用戶自定義策略
 ├── momentum.py           # 12-1 動量策略
 └── mean_reversion.py     # 均值回歸策略
 
+apps/
+├── web/                  # React 18 + Vite + Tailwind 儀表板
+├── mobile/               # React Native + Expo 52 行動 App
+└── shared/               # @quant/shared TypeScript 共享套件
+    └── src/
+        ├── types/        # TypeScript 介面（對應後端 Pydantic schemas）
+        ├── api/client.ts # 平台無關 HTTP client（ClientAdapter 注入）
+        ├── api/ws.ts     # WSManager（自動重連 + 指數退避）
+        ├── api/endpoints.ts # 型別安全 API 端點定義
+        └── utils/format.ts  # 數值/貨幣/日期格式化
+
 tests/
 ├── unit/                 # 單元測試（54 個）
 └── integration/          # 整合測試
@@ -74,8 +101,12 @@ tests/
 ## 3. 開發指令
 
 ```bash
-# 執行所有測試
+# === 後端 ===
 make test                    # pytest tests/ -v
+make lint                    # ruff check + mypy strict
+make dev                     # 開發模式（含熱重載）
+make api                     # 生產模式
+make backtest ARGS="--strategy momentum -u AAPL --start 2023-01-01 --end 2024-12-31"
 
 # 執行特定測試
 pytest tests/unit/test_risk.py -v                              # 單一檔案
@@ -83,16 +114,20 @@ pytest tests/unit/test_risk.py::TestMaxPositionWeight -v       # 單一類別
 pytest tests/unit/test_risk.py::TestMaxPositionWeight::test_approve_within_limit -v  # 單一測試
 
 # 程式碼檢查
-make lint                    # ruff check + mypy strict
 ruff check src/ tests/       # 僅 ruff
 mypy src/                    # 僅 mypy
 
-# 啟動 API 伺服器
-make dev                     # 開發模式（含熱重載）
-make api                     # 生產模式
+# === 前端 ===
+make install-apps            # bun install（所有前端套件）
+make web                     # web dev server (port 3000)
+make mobile                  # expo dev server
+make web-build               # production build
+make web-typecheck           # tsc --noEmit
+make mobile-typecheck        # tsc --noEmit
 
-# 執行回測
-make backtest ARGS="--strategy momentum -u AAPL --start 2023-01-01 --end 2024-12-31"
+# === 全端啟動 ===
+make start                   # 後端 + web 並行
+scripts/start.bat            # Windows：分別開啟視窗
 ```
 
 ## 4. 撰寫新策略
@@ -135,20 +170,16 @@ class MyStrategy(Strategy):
 
 ### 步驟二：註冊策略
 
-在 `src/cli/main.py` 的 `_resolve_strategy()` 中加入：
+在 `src/api/routes/backtest.py` 的 `_resolve_strategy()` 和 `src/cli/main.py` 的 `_resolve_strategy()` 中加入：
 
 ```python
-def _resolve_strategy(name: str):
-    from strategies.momentum import MomentumStrategy
-    from strategies.mean_reversion import MeanReversionStrategy
-    from strategies.my_strategy import MyStrategy   # <-- 新增 import
+from strategies.my_strategy import MyStrategy   # <-- 新增 import
 
-    mapping = {
-        "momentum": MomentumStrategy,
-        "mean_reversion": MeanReversionStrategy,
-        "my_strategy": MyStrategy,                  # <-- 新增對應
-    }
-    ...
+mapping = {
+    "momentum": MomentumStrategy,
+    "mean_reversion": MeanReversionStrategy,
+    "my_strategy": MyStrategy,                  # <-- 新增對應
+}
 ```
 
 ### 步驟三：執行回測
@@ -288,7 +319,7 @@ constraints = OptConstraints(
 
 1. **設定可見時間** — `feed.set_current_date(bar_date)` 防止前視偏誤
 2. **更新市場價格** — 持倉以市價重新估值
-3. **檢查是否為再平衡日** — 依頻率判定（每日/每週一/每月初 1-3 日）
+3. **檢查是否為再平衡日** — 依頻率判定（每日/每週一/每月初）
 4. **策略訊號** — `strategy.on_bar(ctx)` 產出目標權重
 5. **生成訂單** — `weights_to_orders()` 計算當前持倉與目標的差異
 6. **風控檢查** — `risk_engine.check_orders()` 過濾被拒絕的訂單
@@ -326,7 +357,125 @@ class DataFeed(ABC):
 - 時間戳遞增
 - 無 5 sigma 價格跳躍
 
-## 10. 測試
+## 10. 前後端整合
+
+### 前端架構模式
+
+Web 和 Mobile 共享 `@quant/shared` 套件，各平台透過 adapter 注入平台特定邏輯：
+
+```
+@quant/shared (types, API client, WS manager, formatters)
+    ↑                           ↑
+apps/web/src/core/api/     apps/mobile/src/api/
+  client.ts (localStorage)   client.ts (SecureStore)
+```
+
+**匯入慣例：** Feature 程式碼從 `@core/*` 匯入（不直接匯入 `@quant/shared`），保持平台無關。
+
+### 前後端連線對照
+
+| 前端畫面 | 後端端點 | 協議 |
+|---------|---------|------|
+| Dashboard 即時 NAV | `GET /api/v1/portfolio` | REST + WebSocket `portfolio` |
+| Positions 部位列表 | `GET /api/v1/portfolio/positions` | REST |
+| Strategies 啟動/停止 | `POST /api/v1/strategies/{id}/start\|stop` | REST |
+| Alerts 警報 Feed | `GET /api/v1/risk/alerts` | REST + WebSocket `alerts` |
+| Alerts Kill Switch | `POST /api/v1/risk/kill-switch` | REST |
+| Settings 系統狀態 | `GET /api/v1/system/status` | REST |
+| Settings 風控規則 | `GET /api/v1/risk/rules` + `PUT /api/v1/risk/rules/{name}` | REST |
+| Backtest 回測 | `POST /api/v1/backtest` + `GET /api/v1/backtest/{id}` | REST |
+
+### WebSocket 頻道
+
+| 頻道 | 推播內容 |
+|------|---------|
+| `portfolio` | 部位與 NAV 即時更新 |
+| `alerts` | 風險警報 |
+| `orders` | 訂單成交與狀態變更 |
+| `market` | 行情資料更新 |
+
+連線格式：`ws://{host}:{port}/ws/{channel}`
+
+### 核心 TypeScript 型別
+
+定義於 `apps/shared/src/types/`，對應後端 Pydantic schemas：
+
+```typescript
+Portfolio {
+  nav: number
+  cash: number
+  daily_pnl: number
+  daily_pnl_pct: number
+  gross_exposure: number
+  net_exposure: number
+  positions_count: number
+  positions: Position[]
+  as_of: string              // ISO 時間戳
+}
+
+Position {
+  symbol: string
+  quantity: number
+  avg_cost: number
+  market_price: number
+  market_value: number
+  unrealized_pnl: number
+  weight: number             // 佔 NAV 比例
+}
+
+StrategyInfo {
+  name: string
+  status: "running" | "stopped" | "error"
+  pnl: number
+}
+
+OrderInfo {
+  id: string
+  symbol: string
+  side: "BUY" | "SELL"
+  quantity: number
+  price: number | null
+  status: string
+  filled_qty: number
+  filled_avg_price: number
+  commission: number
+  created_at: string
+  strategy_id: string
+}
+
+RiskAlert {
+  timestamp: string
+  rule_name: string
+  severity: "INFO" | "WARNING" | "CRITICAL"
+  metric_value: number
+  threshold: number
+  action_taken: string
+  message: string
+}
+```
+
+### 版本相容性注意事項
+
+| 項目 | 後端定義 | 前端使用 |
+|------|---------|---------|
+| API 前綴 | `/api/v1/` | `/api/v1/` |
+| 金額型別 | `Decimal` → JSON 序列化為數字 | `number` 接收 |
+| 訂單 Side | `BUY` / `SELL`（Python Enum） | `"BUY" \| "SELL"`（TypeScript） |
+| 風險警報嚴重度 | INFO / WARNING / CRITICAL / EMERGENCY | INFO / WARNING / CRITICAL |
+
+### 部署架構
+
+```
+[瀏覽器/行動裝置]              [伺服器/本機]
+Web / Mobile App   ←HTTP→   FastAPI (Port 8000)
+                   ←WS→     WebSocket (/ws/*)
+                                    ↕
+                             PostgreSQL (DB)
+                                    ↕
+                             Yahoo Finance API
+```
+
+## 11. 測試
 
 ```bash
 # 執行所有測試
@@ -361,7 +510,7 @@ def test_example():
     # 斷言...
 ```
 
-## 11. 配置系統
+## 12. 配置系統
 
 `src/config.py` 使用 Pydantic Settings 搭配單例模式：
 
@@ -380,7 +529,7 @@ override_config(test_config)
 
 優先級：環境變數 > `.env` 檔案 > 預設值
 
-## 12. 程式碼慣例
+## 13. 程式碼慣例
 
 - **語言：** 程式碼註解與文件字串使用繁體中文
 - **型別安全：** 所有價格/數量使用 `Decimal`，mypy 嚴格模式

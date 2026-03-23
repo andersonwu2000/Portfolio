@@ -1,0 +1,13 @@
+__pycache__
+*.pyc
+.git
+.env
+.env.*
+data/
+.cache/
+node_modules/
+apps/web/dist/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
