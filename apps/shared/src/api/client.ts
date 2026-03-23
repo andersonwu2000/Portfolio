@@ -55,7 +55,12 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     let detail = `HTTP ${res.status}`;
     try {
       const b = await res.json();
-      detail = b.detail || detail;
+      if (typeof b.detail === "string") {
+        detail = b.detail;
+      } else if (Array.isArray(b.detail)) {
+        // Pydantic validation errors: [{msg, loc, type, ...}]
+        detail = b.detail.map((e: { msg: string }) => e.msg).join("; ");
+      }
     } catch {
       // non-JSON error body
     }

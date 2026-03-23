@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { useApi, useWs } from "@core/hooks";
-import { fmtDate, fmtTime, fmtNum } from "@core/utils";
+import { fmtDate, fmtTime, fmtNum, translateApiError } from "@core/utils";
 import { StatusBadge, ErrorAlert, InfoTooltip, useToast } from "@shared/ui";
 import { useT } from "@core/i18n";
 import { useAuth } from "@core/auth";
@@ -62,7 +62,7 @@ export function RiskPage() {
       setKillMsg(resp.message);
       toast("success", t.toast.killSwitchActivated);
     } catch (err) {
-      setKillMsg(err instanceof Error ? err.message : "Kill switch failed");
+      setKillMsg(translateApiError(err instanceof Error ? err.message : t.common.requestFailed, t));
     } finally {
       setKillLoading(false);
     }

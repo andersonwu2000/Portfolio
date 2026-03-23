@@ -211,7 +211,7 @@ class UserResponse(BaseModel):
 class CreateUserRequest(BaseModel):
     username: str = Field(min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$")
     display_name: str = Field(default="", max_length=128)
-    password: str = Field(min_length=8, max_length=128)
+    password: str = Field(min_length=8, max_length=128, pattern=r"^[a-zA-Z0-9]+$")
     role: str = Field(default="viewer")
 
     @field_validator("role")
@@ -239,9 +239,9 @@ class UpdateUserRequest(BaseModel):
 
 
 class ResetPasswordRequest(BaseModel):
-    new_password: str = Field(min_length=8, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128, pattern=r"^[a-zA-Z0-9]+$")
 
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
-    new_password: str = Field(min_length=8, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128, pattern=r"^[a-zA-Z0-9]+$")

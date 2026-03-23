@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useApi } from "@core/hooks";
-import { fmtCurrency, pnlColor } from "@core/utils";
+import { fmtCurrency, pnlColor, translateApiError } from "@core/utils";
 import { StatusBadge, ErrorAlert, InfoTooltip, Skeleton } from "@shared/ui";
 import { useT } from "@core/i18n";
 import { useAuth } from "@core/auth";
@@ -58,7 +58,7 @@ export function StrategiesPage() {
       }
       refresh();
     } catch (err) {
-      setToggleError(err instanceof Error ? err.message : "Operation failed");
+      setToggleError(translateApiError(err instanceof Error ? err.message : t.common.requestFailed, t));
     } finally {
       setToggling(null);
     }

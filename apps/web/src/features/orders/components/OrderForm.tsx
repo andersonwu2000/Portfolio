@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ordersApi } from "../api";
 import { useT } from "@core/i18n";
+import { translateApiError } from "@core/utils";
 import { useToast } from "@shared/ui";
 
 interface Props {
@@ -35,7 +36,7 @@ export function OrderForm({ onSubmitted }: Props) {
       toast("success", t.toast.orderSubmitted);
       onSubmitted();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : t.common.orderFailed;
+      const msg = translateApiError(err instanceof Error ? err.message : t.common.orderFailed, t);
       setError(msg);
       toast("error", t.toast.orderFailed);
     } finally {

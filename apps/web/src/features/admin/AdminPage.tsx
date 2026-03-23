@@ -7,7 +7,11 @@ import type { Column } from "@shared/ui";
 import type { UserInfo, UserRole } from "@quant/shared";
 import { fmtDate } from "@quant/shared";
 import { Pencil, KeyRound, Trash2 } from "lucide-react";
+import { translateApiError } from "@core/utils";
 import { adminApi } from "./api";
+
+const PW_PATTERN = /^[a-zA-Z0-9]+$/;
+const isValidPassword = (pw: string) => pw.length >= 8 && PW_PATTERN.test(pw);
 
 const ROLE_BADGE_COLORS: Record<UserRole, string> = {
   viewer: "bg-slate-200 dark:bg-slate-500/20 text-slate-600 dark:text-slate-400",
@@ -31,7 +35,7 @@ export function AdminPage() {
   const [resetUser, setResetUser] = useState<UserInfo | null>(null);
 
   // Create form state
-  const [createForm, setCreateForm] = useState({ username: "", display_name: "", password: "", role: "viewer" });
+  const [createForm, setCreateForm] = useState({ username: "", display_name: "", password: "", confirmPassword: "", role: "viewer" });
   const [createLoading, setCreateLoading] = useState(false);
 
   // Edit form state
@@ -40,20 +44,25 @@ export function AdminPage() {
 
   // Reset password state
   const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
 
   const roleDescriptions = t.admin.roleDescriptions as Record<string, string>;
 
   const handleCreate = async () => {
+    if (createForm.password !== createForm.confirmPassword) {
+      toast("error", t.admin.passwordMismatch);
+      return;
+    }
     setCreateLoading(true);
     try {
       await adminApi.createUser(createForm);
       toast("success", t.admin.userCreated);
       setShowCreateModal(false);
-      setCreateForm({ username: "", display_name: "", password: "", role: "viewer" });
+      setCreateForm({ username: "", display_name: "", password: "", confirmPassword: "", role: "viewer" });
       refresh();
     } catch (err) {
-      toast("error", err instanceof Error ? err.message : t.common.requestFailed);
+      toast("error", translateApiError(err instanceof Error ? err.message : t.common.requestFailed, t));
     } finally {
       setCreateLoading(false);
     }
@@ -72,7 +81,7 @@ export function AdminPage() {
       setEditingUser(null);
       refresh();
     } catch (err) {
-      toast("error", err instanceof Error ? err.message : t.common.requestFailed);
+      toast("error", translateApiError(err instanceof Error ? err.message : t.common.requestFailed, t));
     } finally {
       setEditLoading(false);
     }
@@ -80,14 +89,19 @@ export function AdminPage() {
 
   const handleResetPassword = async () => {
     if (!resetUser) return;
+    if (newPassword !== confirmNewPassword) {
+      toast("error", t.admin.passwordMismatch);
+      return;
+    }
     setResetLoading(true);
     try {
       await adminApi.resetPassword(resetUser.id, newPassword);
       toast("success", t.admin.passwordReset);
       setResetUser(null);
       setNewPassword("");
+      setConfirmNewPassword("");
     } catch (err) {
-      toast("error", err instanceof Error ? err.message : t.common.requestFailed);
+      toast("error", translateApiError(err instanceof Error ? err.message : t.common.requestFailed, t));
     } finally {
       setResetLoading(false);
     }
@@ -104,7 +118,7 @@ export function AdminPage() {
       toast("success", t.admin.userDeleted);
       refresh();
     } catch (err) {
-      toast("error", err instanceof Error ? err.message : t.common.requestFailed);
+      toast("error", translateApiError(err instanceof Error ? err.message : t.common.requestFailed, t));
     }
   };
 
@@ -114,7 +128,7 @@ export function AdminPage() {
       toast("success", t.admin.userUpdated);
       refresh();
     } catch (err) {
-      toast("error", err instanceof Error ? err.message : t.common.requestFailed);
+      toast("error", translateApiError(err instanceof Error ? err.message : t.common.requestFailed, t));
     }
   };
 
@@ -125,6 +139,7 @@ export function AdminPage() {
 
   const openReset = (user: UserInfo) => {
     setNewPassword("");
+    setConfirmNewPassword("");
     setResetUser(user);
   };
 
@@ -274,8 +289,32 @@ export function AdminPage() {
               type="password"
               value={createForm.password}
               onChange={(e) => setCreateForm((f) => ({ ...f, password: e.target.value }))}
-              className="w-full bg-slate-50 dark:bg-surface-dark border border-slate-200 dark:border-surface-light rounded-lg px-3 py-2 text-sm"
+              placeholder={t.admin.passwordHint}
+              className={`w-full bg-slate-50 dark:bg-surface-dark border rounded-lg px-3 py-2 text-sm ${
+                createForm.password && !isValidPassword(createForm.password)
+                  ? "border-red-400 dark:border-red-500"
+                  : "border-slate-200 dark:border-surface-light"
+              }`}
             />
+            {createForm.password && !isValidPassword(createForm.password) && (
+              <p className="mt-1 text-xs text-red-500">{t.admin.passwordHint}</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">{t.admin.confirmPassword}</label>
+            <input
+              type="password"
+              value={createForm.confirmPassword}
+              onChange={(e) => setCreateForm((f) => ({ ...f, confirmPassword: e.target.value }))}
+              className={`w-full bg-slate-50 dark:bg-surface-dark border rounded-lg px-3 py-2 text-sm ${
+                createForm.confirmPassword && createForm.password !== createForm.confirmPassword
+                  ? "border-red-400 dark:border-red-500"
+                  : "border-slate-200 dark:border-surface-light"
+              }`}
+            />
+            {createForm.confirmPassword && createForm.password !== createForm.confirmPassword && (
+              <p className="mt-1 text-xs text-red-500">{t.admin.passwordMismatch}</p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">{t.admin.role}</label>
@@ -300,7 +339,7 @@ export function AdminPage() {
             </button>
             <button
               onClick={handleCreate}
-              disabled={createLoading || !createForm.username.trim() || !createForm.password.trim()}
+              disabled={createLoading || !createForm.username.trim() || !isValidPassword(createForm.password) || createForm.password !== createForm.confirmPassword}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg text-sm font-medium text-white transition-colors"
             >
               {createLoading ? "..." : t.common.submit}
@@ -377,19 +416,43 @@ export function AdminPage() {
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-surface-dark border border-slate-200 dark:border-surface-light rounded-lg px-3 py-2 text-sm"
+              placeholder={t.admin.passwordHint}
+              className={`w-full bg-slate-50 dark:bg-surface-dark border rounded-lg px-3 py-2 text-sm ${
+                newPassword && !isValidPassword(newPassword)
+                  ? "border-red-400 dark:border-red-500"
+                  : "border-slate-200 dark:border-surface-light"
+              }`}
             />
+            {newPassword && !isValidPassword(newPassword) && (
+              <p className="mt-1 text-xs text-red-500">{t.admin.passwordHint}</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">{t.admin.confirmNewPassword}</label>
+            <input
+              type="password"
+              value={confirmNewPassword}
+              onChange={(e) => setConfirmNewPassword(e.target.value)}
+              className={`w-full bg-slate-50 dark:bg-surface-dark border rounded-lg px-3 py-2 text-sm ${
+                confirmNewPassword && newPassword !== confirmNewPassword
+                  ? "border-red-400 dark:border-red-500"
+                  : "border-slate-200 dark:border-surface-light"
+              }`}
+            />
+            {confirmNewPassword && newPassword !== confirmNewPassword && (
+              <p className="mt-1 text-xs text-red-500">{t.admin.passwordMismatch}</p>
+            )}
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button
-              onClick={() => setResetUser(null)}
+              onClick={() => { setResetUser(null); setConfirmNewPassword(""); }}
               className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-surface-light transition-colors"
             >
               {t.common.cancel}
             </button>
             <button
               onClick={handleResetPassword}
-              disabled={resetLoading || !newPassword.trim()}
+              disabled={resetLoading || !isValidPassword(newPassword) || newPassword !== confirmNewPassword}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg text-sm font-medium text-white transition-colors"
             >
               {resetLoading ? "..." : t.common.submit}

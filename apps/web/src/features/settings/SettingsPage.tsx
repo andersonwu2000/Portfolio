@@ -1,14 +1,42 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, type ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
 import { useApi } from "@core/hooks";
 import { isAuthenticated, login } from "@core/api";
-import { fmtUptime } from "@core/utils";
-import { MetricCard, MetricCardSkeleton, useToast } from "@shared/ui";
+import { useToast } from "@shared/ui";
 import { useT } from "@core/i18n";
 import { useAuth } from "@core/auth";
 import { langLabels, type Lang } from "@core/i18n";
 import { useTheme, type Theme } from "@core/theme";
+import { auth as authApi } from "@quant/shared";
+import { translateApiError } from "@core/utils";
+
+const PW_PATTERN = /^[a-zA-Z0-9]+$/;
+const isValidPassword = (pw: string) => pw.length >= 8 && PW_PATTERN.test(pw);
 import { systemApi } from "./api";
 import { SystemMetrics } from "./components/SystemMetrics";
+
+function CollapsibleSection({ title, children }: { title: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="bg-slate-50 dark:bg-surface rounded-xl shadow-sm dark:shadow-none overflow-hidden">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-5 py-4 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
+      >
+        <span>{title}</span>
+        <ChevronDown
+          size={16}
+          className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && (
+        <div className="px-5 pb-5 space-y-4 border-t border-slate-200 dark:border-surface-light pt-4">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function SettingsPage({ onSave }: { onSave?: () => void } = {}) {
   const { t, lang, setLang } = useT();
@@ -23,6 +51,13 @@ export function SettingsPage({ onSave }: { onSave?: () => void } = {}) {
   const [saved, setSaved] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
+
+  // Change password state
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [changePwLoading, setChangePwLoading] = useState(false);
+
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
@@ -41,7 +76,7 @@ export function SettingsPage({ onSave }: { onSave?: () => void } = {}) {
       onSave?.();
       timerRef.current = setTimeout(() => setSaved(false), 2000);
     } catch (err) {
-      setLoginError(err instanceof Error ? err.message : "Login failed");
+      setLoginError(translateApiError(err instanceof Error ? err.message : t.common.requestFailed, t));
     } finally {
       setLoginLoading(false);
     }
@@ -49,9 +84,33 @@ export function SettingsPage({ onSave }: { onSave?: () => void } = {}) {
 
   const canSubmit = loginMode === "apikey" ? key.trim() : username.trim() && password.trim();
 
+  const handleChangePassword = async () => {
+    if (newPassword !== confirmNewPassword) {
+      toast("error", t.admin.passwordMismatch);
+      return;
+    }
+    setChangePwLoading(true);
+    try {
+      await authApi.changePassword(currentPassword, newPassword);
+      toast("success", t.settings.passwordChanged);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmNewPassword("");
+    } catch (err) {
+      toast("error", translateApiError(err instanceof Error ? err.message : t.common.requestFailed, t));
+    } finally {
+      setChangePwLoading(false);
+    }
+  };
+
+  const canChangePassword =
+    currentPassword.trim() &&
+    isValidPassword(newPassword) &&
+    newPassword === confirmNewPassword;
+
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold">{t.settings.title}</h2>
+    <div className="space-y-3">
+      <h2 className="text-2xl font-bold mb-3">{t.settings.title}</h2>
 
       {!isAuthenticated() && (
         <div className="bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl p-4 text-sm">
@@ -59,46 +118,41 @@ export function SettingsPage({ onSave }: { onSave?: () => void } = {}) {
         </div>
       )}
 
-      <div className="bg-slate-50 dark:bg-surface rounded-xl p-5 space-y-4 shadow-sm dark:shadow-none">
+      {/* 登入 */}
+      <CollapsibleSection title={loginMode === "password" ? t.admin.loginWithPassword : t.settings.apiKey}>
         {loginMode === "password" ? (
-          <>
-            <p className="text-sm font-medium text-slate-600 dark:text-slate-400">{t.admin.loginWithPassword}</p>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">{t.admin.usernameLabel}</label>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder={t.admin.usernameLabel}
-                  className="w-full bg-slate-50 dark:bg-surface-dark border border-slate-200 dark:border-surface-light rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">{t.admin.passwordLabel}</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={t.admin.passwordLabel}
-                  className="w-full bg-slate-50 dark:bg-surface-dark border border-slate-200 dark:border-surface-light rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">{t.admin.usernameLabel}</label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder={t.admin.usernameLabel}
+                className="w-full bg-white dark:bg-surface-dark border border-slate-200 dark:border-surface-light rounded-lg px-3 py-2 text-sm"
+              />
             </div>
-          </>
+            <div>
+              <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">{t.admin.passwordLabel}</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={t.admin.passwordHint}
+                className="w-full bg-white dark:bg-surface-dark border border-slate-200 dark:border-surface-light rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
         ) : (
-          <>
-            <p className="text-sm font-medium text-slate-600 dark:text-slate-400">{t.settings.apiKey}</p>
-            <input
-              type="password"
-              value={key}
-              onChange={(e) => setKey(e.target.value)}
-              placeholder={t.settings.apiKeyPlaceholder}
-              className="w-full bg-slate-50 dark:bg-surface-dark border border-slate-200 dark:border-surface-light rounded-lg px-3 py-2 text-sm"
-            />
-          </>
+          <input
+            type="password"
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+            placeholder={t.settings.apiKeyPlaceholder}
+            className="w-full bg-white dark:bg-surface-dark border border-slate-200 dark:border-surface-light rounded-lg px-3 py-2 text-sm"
+          />
         )}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between pt-1">
           <button
             onClick={() => setLoginMode(loginMode === "password" ? "apikey" : "password")}
             className="text-xs text-blue-500 hover:text-blue-400 transition-colors"
@@ -116,10 +170,69 @@ export function SettingsPage({ onSave }: { onSave?: () => void } = {}) {
         {loginError && (
           <p className="text-sm text-red-500 dark:text-red-400">{loginError}</p>
         )}
-      </div>
+      </CollapsibleSection>
 
-      <div className="bg-slate-50 dark:bg-surface rounded-xl p-5 space-y-4 shadow-sm dark:shadow-none">
-        <p className="text-sm font-medium text-slate-600 dark:text-slate-400">{t.settings.language}</p>
+      {/* 修改密碼 */}
+      {isAuthenticated() && (
+        <CollapsibleSection title={t.settings.changePassword}>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">{t.settings.currentPassword}</label>
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className="w-full bg-white dark:bg-surface-dark border border-slate-200 dark:border-surface-light rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">{t.settings.newPassword}</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder={t.admin.passwordHint}
+                className={`w-full bg-white dark:bg-surface-dark border rounded-lg px-3 py-2 text-sm ${
+                  newPassword && !isValidPassword(newPassword)
+                    ? "border-red-400 dark:border-red-500"
+                    : "border-slate-200 dark:border-surface-light"
+                }`}
+              />
+              {newPassword && !isValidPassword(newPassword) && (
+                <p className="mt-1 text-xs text-red-500">{t.admin.passwordHint}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">{t.settings.confirmNewPassword}</label>
+              <input
+                type="password"
+                value={confirmNewPassword}
+                onChange={(e) => setConfirmNewPassword(e.target.value)}
+                className={`w-full bg-white dark:bg-surface-dark border rounded-lg px-3 py-2 text-sm ${
+                  confirmNewPassword && newPassword !== confirmNewPassword
+                    ? "border-red-400 dark:border-red-500"
+                    : "border-slate-200 dark:border-surface-light"
+                }`}
+              />
+              {confirmNewPassword && newPassword !== confirmNewPassword && (
+                <p className="mt-1 text-xs text-red-500">{t.admin.passwordMismatch}</p>
+              )}
+            </div>
+          </div>
+          <div className="flex justify-end pt-1">
+            <button
+              onClick={handleChangePassword}
+              disabled={changePwLoading || !canChangePassword}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg text-sm font-medium text-white transition-colors"
+            >
+              {changePwLoading ? "..." : t.settings.changePassword}
+            </button>
+          </div>
+        </CollapsibleSection>
+      )}
+
+      {/* 語言 */}
+      <CollapsibleSection title={t.settings.language}>
         <div className="flex gap-2">
           {(Object.entries(langLabels) as [Lang, string][]).map(([code, label]) => (
             <button
@@ -135,10 +248,10 @@ export function SettingsPage({ onSave }: { onSave?: () => void } = {}) {
             </button>
           ))}
         </div>
-      </div>
+      </CollapsibleSection>
 
-      <div className="bg-slate-50 dark:bg-surface rounded-xl p-5 space-y-4 shadow-sm dark:shadow-none">
-        <p className="text-sm font-medium text-slate-600 dark:text-slate-400">{t.settings.theme}</p>
+      {/* 主題 */}
+      <CollapsibleSection title={t.settings.theme}>
         <div className="flex gap-2">
           {(["light", "dark", "system"] as Theme[]).map((option) => {
             const labels: Record<Theme, string> = {
@@ -161,26 +274,12 @@ export function SettingsPage({ onSave }: { onSave?: () => void } = {}) {
             );
           })}
         </div>
-      </div>
+      </CollapsibleSection>
 
-      {loading && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCardSkeleton /><MetricCardSkeleton /><MetricCardSkeleton /><MetricCardSkeleton />
-        </div>
-      )}
-      {status && (
-        <div>
-          <p className="text-base font-semibold text-slate-600 dark:text-slate-400 mb-3">{t.settings.systemStatus}</p>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <MetricCard label={t.settings.mode} value={status.mode} />
-            <MetricCard label={t.settings.uptime} value={fmtUptime(status.uptime_seconds)} />
-            <MetricCard label={t.settings.strategiesRunning} value={String(status.strategies_running)} />
-            <MetricCard label={t.settings.dataSource} value={status.data_source} />
-          </div>
-        </div>
-      )}
-
-      <SystemMetrics />
+      {/* 系統狀態 */}
+      <CollapsibleSection title={t.settings.systemStatus}>
+        <SystemMetrics />
+      </CollapsibleSection>
     </div>
   );
 }

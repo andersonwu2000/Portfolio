@@ -25,6 +25,30 @@ logger = logging.getLogger(__name__)
 limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
 
 
+def _seed_admin(config: object) -> None:
+    """首次啟動時建立預設 admin 帳號（若不存在）。"""
+    from src.config import TradingConfig
+    from src.data.store import metadata
+    from src.data.user_store import get_user_store, _get_engine
+    from src.api.password import hash_password
+
+    engine = _get_engine()
+    metadata.create_all(engine)
+
+    store = get_user_store()
+    if store.get_by_username("admin"):
+        return  # 已存在，跳過
+
+    cfg = config if isinstance(config, TradingConfig) else get_config()
+    pw_hash, pw_salt = hash_password(cfg.admin_password)
+    store.create("admin", "Administrator", pw_hash, pw_salt, "admin")
+    logger.warning(
+        "Default admin account created. Username: admin  Password: %s  "
+        "Please change it immediately after first login.",
+        cfg.admin_password,
+    )
+
+
 def create_app() -> FastAPI:
     """建立 FastAPI 應用。"""
     config = get_config()
@@ -114,6 +138,7 @@ def create_app() -> FastAPI:
             "momentum_12_1": {"status": "stopped", "pnl": 0.0},
             "mean_reversion": {"status": "stopped", "pnl": 0.0},
         }
+        _seed_admin(config)
 
     @app.on_event("shutdown")
     async def shutdown() -> None:
