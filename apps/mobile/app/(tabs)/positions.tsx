@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import type { Position } from "@quant/shared";
 import { portfolio } from "@quant/shared";
 import { PositionRow } from "../../src/components/PositionRow";
+import { PositionPieChart } from "../../src/components/PositionPieChart";
 import { fmtCurrency } from "../../src/utils/format";
 import { useT } from "@/src/i18n";
 import { bg, surface, textSecondary, textPrimary, blue, success, danger, textMuted } from "@/src/theme/colors";
@@ -58,6 +59,11 @@ export default function PositionsScreen() {
         ListHeaderComponent={
           <>
             {error && <Text style={styles.error}>{error}</Text>}
+            {sorted.length > 0 && (
+              <PositionPieChart
+                positions={sorted.map((p) => ({ symbol: p.symbol, weight: p.weight }))}
+              />
+            )}
             <View style={styles.summary}>
               <View style={styles.summaryItem}>
                 <Text style={styles.summaryLabel}>{t.portfolio.totalValue}</Text>

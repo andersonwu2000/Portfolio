@@ -22,6 +22,7 @@ export interface Portfolio {
   daily_pnl_pct: number;
   positions: Position[];
   as_of: string;
+  nav_history?: { date: string; nav: number }[];
 }
 
 export interface StrategyInfo {

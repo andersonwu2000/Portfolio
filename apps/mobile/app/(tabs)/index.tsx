@@ -3,6 +3,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { usePortfolio } from "../../src/hooks/usePortfolio";
 import { MetricCard } from "../../src/components/MetricCard";
 import { PositionRow } from "../../src/components/PositionRow";
+import { NavChart } from "../../src/components/NavChart";
 import { fmtCurrency, fmtPct, pnlColor } from "../../src/utils/format";
 import { useT } from "@/src/i18n";
 import { useMemo } from "react";
@@ -53,6 +54,9 @@ export default function DashboardScreen() {
                 {fmtCurrency(data.daily_pnl)} ({fmtPct(data.daily_pnl_pct)}) {t.dashboard.today}
               </Text>
             </View>
+            {data.nav_history && data.nav_history.length > 1 && (
+              <NavChart data={data.nav_history} />
+            )}
             <View style={styles.metricsRow}>
               <MetricCard label={t.dashboard.cash} value={fmtCurrency(data.cash)} small />
               <MetricCard label={t.dashboard.exposure} value={fmtCurrency(data.gross_exposure)} small />

@@ -69,3 +69,26 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: cd apps && bun install
       - run: cd apps/mobile && bun run typecheck
+
+  mobile-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: cd mobile && bun run test
+
+  e2e-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: cd web && npx playwright install --with-deps chromium
+      - run: cd web && bun run e2e

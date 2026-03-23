@@ -14,17 +14,17 @@
 | WebSocket | ✅ | portfolio, orders, alerts 已用；market 未用 |
 | i18n | ✅ | 中英文完整覆蓋（30+ 翻譯鍵） |
 | Mobile | ✅ | 7 個 tab、基本功能對等 |
-| 測試 | ⚠️ | Web 71 unit tests、無 E2E；Mobile 0 tests |
-| 無障礙 | ❌ | 極少 ARIA、無鍵盤導航 |
-| 主題 | ❌ | 僅深色、無淺色切換 |
+| 測試 | ✅ | Web 71+ unit + E2E、Mobile 20+、Shared 38+ |
+| 無障礙 | ✅ | ARIA 標籤已補齊 |
+| 主題 | ✅ | 深色/淺色切換已完成 |
 | PWA | ❌ | 無 Service Worker、無離線支援 |
-| 效能 | ❌ | 無虛擬列表、無 code splitting 以外的最佳化 |
+| 效能 | ✅ | 虛擬列表、exponential backoff 已完成 |
 
 ---
 
 ## 一、測試與品質（高優先）
 
-### 1. Web E2E 測試
+### 1. Web E2E 測試 ✅
 
 - Playwright 設定 + MSW mock API
 - 核心旅程：登入 → Dashboard → 下單 → 查看訂單
@@ -32,25 +32,25 @@
 - 風控流程：切換規則 → Kill Switch
 - 預計 3 個 spec 檔案
 
-### 2. Mobile 測試建設
+### 2. Mobile 測試建設 ✅
 
 - Jest + React Native Testing Library 設定
 - 元件單元測試（MetricCard, PositionRow, StrategyRow, OrderRow, AlertItem, Skeleton）
 - Hook 測試（usePortfolio, useOrders, useBacktest, useRealtimeData）
 - 目標：≥ 20 tests
 
-### 3. Shared 測試補強
+### 3. Shared 測試補強 ✅
 
 - WebSocket Manager 測試（連線、重連、backoff）
 - API client 錯誤處理測試
 - 所有 endpoint 函數測試
-- 目標：≥ 15 tests
+- 達成：38+ tests（目標 ≥ 15）
 
 ---
 
 ## 二、使用者體驗（高優先）
 
-### 4. 深色/淺色主題切換
+### 4. 深色/淺色主題切換 ✅
 
 - ThemeContext + `useTheme()` hook
 - 系統偏好偵測（`prefers-color-scheme`）
@@ -80,7 +80,7 @@
 
 ## 三、無障礙性（中優先）
 
-### 8. ARIA 標籤補齊
+### 8. ARIA 標籤補齊 ✅
 
 - 所有互動元素加 `aria-label`
 - 表格加 `role="table"` / `role="grid"`
@@ -120,13 +120,13 @@
 
 ## 五、效能最佳化（中優先）
 
-### 15. 大型列表虛擬化
+### 15. 大型列表虛擬化 ✅
 
 - `react-window` 或 `@tanstack/virtual`
 - Orders、Positions、Alerts 表格 > 100 筆時自動啟用
 - Mobile：FlatList `getItemLayout` + `windowSize` 調校
 
-### 16. 回測輪詢 Exponential Backoff
+### 16. 回測輪詢 Exponential Backoff ✅
 
 - 目前固定 2–3 秒輪詢，最多 900 次 API 呼叫
 - 改為指數退避（2s → 4s → 8s → cap 30s）
@@ -159,11 +159,11 @@
 
 ## 七、CI/CD 強化（低優先）
 
-### 23. 前端測試 CI Jobs
+### 23. 前端測試 CI Jobs ✅
 
 - `web-test`、`shared-test` 已加入 ✅
-- 待加入：`mobile-test`（需 Jest 設定）
-- 待加入：Playwright E2E job（MSW mock API）
+- `mobile-test` 已加入 ✅
+- Playwright `e2e-test` 已加入 ✅
 
 ---
 

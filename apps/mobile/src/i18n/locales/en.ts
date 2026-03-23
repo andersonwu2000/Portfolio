@@ -178,6 +178,7 @@ export const en = {
     longPressHint: "Long press to activate",
     operationFailed: "Operation failed",
     failed: "Failed",
+    offline: "Offline \u2014 showing cached data",
   },
 };
 

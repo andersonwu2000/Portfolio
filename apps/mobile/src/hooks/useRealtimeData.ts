@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { AppState as RNAppState } from "react-native";
 import { WSManager } from "@quant/shared";
+import { getCached, setCache } from "../utils/cache";
 
 type Channel = ConstructorParameters<typeof WSManager>[0];
 
@@ -24,12 +25,20 @@ export function useRealtimeData<T>(
       const result = await fetchRef.current();
       setData(result);
       setError(null);
+      setCache(channel, result).catch(() => {});
     } catch (err) {
       setError(err instanceof Error ? err.message : "Request failed");
+      // On fetch error, try to return cached data
+      try {
+        const cached = await getCached<T>(channel);
+        if (cached !== null) setData(cached);
+      } catch {
+        // ignore cache read errors
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [channel]);
 
   useEffect(() => {
     refresh();

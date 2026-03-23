@@ -180,5 +180,6 @@ export const zh: Translations = {
     longPressHint: "長按以啟動",
     operationFailed: "操作失敗",
     failed: "失敗",
+    offline: "離線中 \u2014 顯示快取資料",
   },
 };

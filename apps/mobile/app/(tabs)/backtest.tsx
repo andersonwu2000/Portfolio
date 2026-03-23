@@ -5,6 +5,7 @@ import { useT } from "@/src/i18n";
 import { strategies as strategiesApi } from "@quant/shared";
 import type { BacktestRequest, StrategyInfo } from "@quant/shared";
 import { MetricCard } from "@/src/components/MetricCard";
+import { BacktestChart } from "@/src/components/BacktestChart";
 import { fmtPct, fmtNum } from "@/src/utils/format";
 import { bg, surface, textSecondary, textPrimary, textMuted, blueAlpha, blueLight, blueDark, white, danger } from "@/src/theme/colors";
 
@@ -98,6 +99,12 @@ export default function BacktestScreen() {
             <MetricCard label={t.backtest.sortino} value={fmtNum(result.sortino)} small />
             <MetricCard label={t.backtest.winRate} value={fmtPct(result.win_rate)} small />
           </View>
+          {result.nav_series && result.nav_series.length > 1 && (
+            <>
+              <Text style={[styles.sectionTitle, { marginTop: 16 }]}>{t.backtest.navCurve}</Text>
+              <BacktestChart data={result.nav_series} />
+            </>
+          )}
         </View>
       )}
     </ScrollView>

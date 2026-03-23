@@ -6,6 +6,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import * as SecureStore from "expo-secure-store";
 import { AuthProvider, useAuth } from "../src/hooks/useAuth";
 import { ErrorBoundary } from "../src/components/ErrorBoundary";
+import { OfflineBanner } from "../src/components/OfflineBanner";
 import { I18nContext, translations, type Lang } from "../src/i18n";
 import { bg, blue, textPrimary } from "../src/theme/colors";
 
@@ -39,6 +40,7 @@ function RootNavigator() {
   return (
     <>
       <StatusBar style="light" />
+      <OfflineBanner />
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: bg },
