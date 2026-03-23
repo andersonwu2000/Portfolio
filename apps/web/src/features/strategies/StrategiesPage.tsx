@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useApi } from "@core/hooks";
 import { fmtCurrency, pnlColor, translateApiError } from "@core/utils";
-import { StatusBadge, ErrorAlert, InfoTooltip, Skeleton } from "@shared/ui";
+import { Card, StatusBadge, ErrorAlert, InfoTooltip, Skeleton } from "@shared/ui";
 import { useT } from "@core/i18n";
 import { useAuth } from "@core/auth";
 import type { StrategyInfo } from "@core/api";
@@ -72,14 +72,14 @@ export function StrategiesPage() {
       <Skeleton className="h-7 w-40" />
       <div className="grid gap-4">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="bg-slate-50 dark:bg-surface rounded-xl px-5 py-4 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
+          <Card key={i} className="px-5 py-4">
             <div className="flex items-center gap-3">
               <Skeleton className="h-5 w-32" />
               <Skeleton className="h-5 w-16" />
               <div className="flex-1" />
               <Skeleton className="h-9 w-20" />
             </div>
-          </div>
+          </Card>
         ))}
       </div>
     </div>
@@ -98,7 +98,7 @@ export function StrategiesPage() {
           const isExpanded = expanded === s.name;
 
           return (
-            <div key={s.name} className="bg-slate-50 dark:bg-surface rounded-xl overflow-hidden border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
+            <Card key={s.name} className="overflow-hidden">
               <div className="px-5 py-4 flex items-center gap-3">
                 <div className="w-44 shrink-0">
                   <p className="font-semibold flex items-center gap-1.5">
@@ -145,7 +145,7 @@ export function StrategiesPage() {
                   </p>
                 </div>
               )}
-            </div>
+            </Card>
           );
         })}
         {(!strats || strats.length === 0) && (

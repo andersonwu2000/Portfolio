@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useMemo } from "react";
 import { useApi, useWs } from "@core/hooks";
 import { fmtCurrency, fmtPrice, fmtDate, fmtTime } from "@core/utils";
-import { StatusBadge, ErrorAlert, TableSkeleton, ConnectionBanner } from "@shared/ui";
+import { Card, StatusBadge, ErrorAlert, TableSkeleton, ConnectionBanner } from "@shared/ui";
 import { useT } from "@core/i18n";
 import { useAuth } from "@core/auth";
 import { ordersApi } from "./api";
@@ -95,7 +95,7 @@ export function OrdersPage() {
       {loading && <TableSkeleton rows={8} cols={10} />}
 
       {!loading && !error && (
-        <div className="bg-slate-50 dark:bg-surface rounded-xl p-5 overflow-x-auto border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
+        <Card className="p-5 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-surface-light">
@@ -138,7 +138,7 @@ export function OrdersPage() {
           {(!orderList || orderList.length === 0) && (
             <p className="text-center text-slate-500 py-8">{t.orders.noOrders}</p>
           )}
-        </div>
+        </Card>
       )}
     </div>
   );

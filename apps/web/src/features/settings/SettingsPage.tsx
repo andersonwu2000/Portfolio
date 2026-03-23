@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import { useApi } from "@core/hooks";
 import { isAuthenticated, login } from "@core/api";
-import { useToast } from "@shared/ui";
+import { Card, useToast } from "@shared/ui";
 import { useT } from "@core/i18n";
 import { useAuth } from "@core/auth";
 import { langLabels, type Lang } from "@core/i18n";
@@ -15,7 +15,7 @@ import { SystemMetrics } from "./components/SystemMetrics";
 function CollapsibleSection({ title, children }: { title: string; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="bg-slate-50 dark:bg-surface rounded-xl shadow-sm dark:shadow-none overflow-hidden">
+    <Card className="overflow-hidden">
       <button
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center justify-between px-5 py-4 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
@@ -31,7 +31,7 @@ function CollapsibleSection({ title, children }: { title: string; children: Reac
           {children}
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 

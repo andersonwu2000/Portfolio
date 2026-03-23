@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ordersApi } from "../api";
 import { useT } from "@core/i18n";
 import { fmtPrice, translateApiError } from "@core/utils";
-import { useToast } from "@shared/ui";
+import { Card, useToast } from "@shared/ui";
 
 interface Props {
   onSubmitted: () => void;
@@ -51,8 +51,9 @@ export function OrderForm({ onSubmitted }: Props) {
   };
 
   return (
-    <form onSubmit={handleSubmit} aria-label="New order form" className="bg-slate-50 dark:bg-surface rounded-xl p-5 space-y-4 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
-      <p className="text-base font-semibold text-slate-500 dark:text-slate-400">{t.orders.newOrder}</p>
+    <Card className="p-5">
+      <form onSubmit={handleSubmit} aria-label="New order form" className="space-y-4">
+        <p className="text-base font-semibold text-slate-500 dark:text-slate-400">{t.orders.newOrder}</p>
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <label className="space-y-1">
           <span className="text-sm text-slate-400">{t.orders.symbol}</span>
@@ -143,7 +144,8 @@ export function OrderForm({ onSubmitted }: Props) {
           </div>
         </div>
       )}
-      {error && <p className="text-sm text-red-400">{error}</p>}
-    </form>
+        {error && <p className="text-sm text-red-400">{error}</p>}
+      </form>
+    </Card>
   );
 }

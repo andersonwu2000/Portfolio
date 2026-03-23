@@ -81,6 +81,16 @@ export const en = {
     strategy: "Strategy",
     status: "Status",
     noOrders: "No orders found",
+    newOrder: "New Order",
+    buy: "Buy",
+    sell: "Sell",
+    submit: "Submit Order",
+    cancel: "Cancel",
+    confirmTitle: "Confirm Order",
+    confirmMessage: "Place {side} order for {quantity} shares of {symbol} at ${price}?",
+    symbolRequired: "Symbol is required",
+    quantityRequired: "Quantity must be greater than 0",
+    priceRequired: "Price must be greater than 0",
   },
 
   // backtest

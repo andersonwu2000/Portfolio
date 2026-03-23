@@ -3,6 +3,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } f
 import { useT } from "@core/i18n";
 import { useTheme } from "@core/theme";
 import { getChartColors } from "@shared/utils/chartColors";
+import { Card } from "@shared/ui";
 import type { BacktestHistoryEntry } from "../hooks/useBacktestHistory";
 
 const COLORS = ["#3B82F6", "#22C55E", "#F59E0B", "#EF4444"];
@@ -38,7 +39,7 @@ export function CompareChart({ entries }: Props) {
   if (entries.length < 2 || data.length === 0) return null;
 
   return (
-    <div className="bg-slate-50 dark:bg-surface rounded-xl p-5 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
+    <Card className="p-5">
       <p className="text-base font-semibold text-slate-500 dark:text-slate-400 mb-3">{t.backtest.navComparison}</p>
       <ResponsiveContainer width="100%" height={320}>
         <LineChart data={data}>
@@ -61,6 +62,6 @@ export function CompareChart({ entries }: Props) {
           ))}
         </LineChart>
       </ResponsiveContainer>
-    </div>
+    </Card>
   );
 }

@@ -83,6 +83,16 @@ export const zh: Translations = {
     strategy: "策略",
     status: "狀態",
     noOrders: "無訂單記錄",
+    newOrder: "新增訂單",
+    buy: "買入",
+    sell: "賣出",
+    submit: "提交訂單",
+    cancel: "取消",
+    confirmTitle: "確認訂單",
+    confirmMessage: "確認下單 {side} {symbol} {quantity} 股，價格 ${price}？",
+    symbolRequired: "請輸入標的代碼",
+    quantityRequired: "數量必須大於 0",
+    priceRequired: "價格必須大於 0",
   },
 
   // backtest

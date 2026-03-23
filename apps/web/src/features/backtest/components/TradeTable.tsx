@@ -1,5 +1,5 @@
 import { useT } from "@core/i18n";
-import { ExportButton } from "@shared/ui";
+import { Card, ExportButton } from "@shared/ui";
 import { fmtCurrency, fmtNum } from "@core/utils";
 import type { TradeRecord } from "@core/api";
 
@@ -31,7 +31,7 @@ export function TradeTable({ trades }: Props) {
   ]);
 
   return (
-    <div className="bg-slate-50 dark:bg-surface rounded-xl p-5 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
+    <Card className="p-5">
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{t.backtest.tradeDetail}</p>
         <ExportButton filename="trades.csv" headers={headers} rows={rows} />
@@ -64,6 +64,6 @@ export function TradeTable({ trades }: Props) {
           </tbody>
         </table>
       </div>
-    </div>
+    </Card>
   );
 }

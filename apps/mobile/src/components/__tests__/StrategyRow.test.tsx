@@ -1,4 +1,5 @@
 import React from "react";
+import { Alert } from "react-native";
 import { render, screen, fireEvent } from "@testing-library/react-native";
 import { StrategyRow } from "../StrategyRow";
 import type { StrategyInfo } from "@quant/shared";
@@ -11,6 +12,14 @@ jest.mock("../../utils/format", () => ({
     return "#94A3B8";
   },
 }));
+
+// Mock Alert.alert to immediately invoke the action button (second button)
+jest.spyOn(Alert, "alert").mockImplementation(
+  (_title, _message, buttons) => {
+    const actionBtn = buttons?.[1];
+    if (actionBtn?.onPress) actionBtn.onPress();
+  },
+);
 
 describe("StrategyRow", () => {
   const runningStrategy: StrategyInfo = {

@@ -2,6 +2,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import { useT } from "@core/i18n";
 import { useTheme } from "@core/theme";
 import { getChartColors } from "@shared/utils/chartColors";
+import { Card } from "@shared/ui";
 
 interface NavPoint {
   date: string;
@@ -13,7 +14,7 @@ export function ResultChart({ data }: { data: NavPoint[] }) {
   const { isDark } = useTheme();
   const c = getChartColors(isDark);
   return (
-    <div className="bg-slate-50 dark:bg-surface rounded-xl p-5 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
+    <Card className="p-5">
       <p className="text-base font-semibold text-slate-500 dark:text-slate-400 mb-3">{t.backtest.navCurve}</p>
       <ResponsiveContainer width="100%" height={320}>
         <LineChart data={data}>
@@ -24,6 +25,6 @@ export function ResultChart({ data }: { data: NavPoint[] }) {
           <Line type="monotone" dataKey="nav" stroke="#3b82f6" strokeWidth={2} dot={false} />
         </LineChart>
       </ResponsiveContainer>
-    </div>
+    </Card>
   );
 }

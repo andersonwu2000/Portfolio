@@ -12,7 +12,7 @@ export default function SettingsScreen() {
   const { t, lang, setLang } = useT();
   const [status, setStatus] = useState<SystemStatus | null>(null);
   const [rules, setRules] = useState<RiskRule[]>([]);
-  const { logout } = useAuth();
+  const { logout, hasRole } = useAuth();
 
   const loadData = useCallback(async () => {
     try {
@@ -28,9 +28,8 @@ export default function SettingsScreen() {
     loadData();
   }, [loadData]);
 
-  // TODO: toggleRule requires risk_manager role on backend but mobile has no
-  // role-based UI gating yet. The backend will reject unauthorized requests,
-  // but ideally the UI should hide/disable the toggle for insufficient roles.
+  const canManageRisk = hasRole("risk_manager");
+
   const toggleRule = async (name: string, enabled: boolean) => {
     try {
       await risk.toggleRule(name, !enabled);
@@ -87,8 +86,9 @@ export default function SettingsScreen() {
         {rules.map((rule) => (
           <Pressable
             key={rule.name}
-            style={styles.ruleRow}
-            onPress={() => toggleRule(rule.name, rule.enabled)}
+            style={[styles.ruleRow, !canManageRisk && { opacity: 0.5 }]}
+            onPress={() => canManageRisk && toggleRule(rule.name, rule.enabled)}
+            disabled={!canManageRisk}
           >
             <Text style={styles.ruleName}>{rule.name}</Text>
             <View

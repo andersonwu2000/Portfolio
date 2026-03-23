@@ -1,6 +1,6 @@
 import { useApi } from "@core/hooks";
 import { fmtCurrency, fmtPrice, fmtPct, pnlColor } from "@core/utils";
-import { ErrorAlert, MetricCardSkeleton, TableSkeleton, Skeleton } from "@shared/ui";
+import { Card, ErrorAlert, MetricCardSkeleton, TableSkeleton, Skeleton } from "@shared/ui";
 import { useT } from "@core/i18n";
 import type { Portfolio } from "@core/api";
 import { portfolioApi } from "./api";
@@ -25,31 +25,31 @@ export function PortfolioPage() {
       <h2 className="text-2xl font-bold">{t.portfolio.title}</h2>
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 text-sm">
-        <div className="bg-slate-50 dark:bg-surface rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
+        <Card className="p-4">
           <p className="text-slate-500 dark:text-slate-400">{t.dashboard.nav}</p>
           <p className="text-xl font-bold">{fmtCurrency(pf.nav)}</p>
-        </div>
-        <div className="bg-slate-50 dark:bg-surface rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
+        </Card>
+        <Card className="p-4">
           <p className="text-slate-500 dark:text-slate-400">{t.dashboard.cash}</p>
           <p className="text-xl font-bold">{fmtCurrency(pf.cash)}</p>
-        </div>
-        <div className="bg-slate-50 dark:bg-surface rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
+        </Card>
+        <Card className="p-4">
           <p className="text-slate-500 dark:text-slate-400">{t.portfolio.grossExposure}</p>
           <p className="text-xl font-bold">{fmtPct(pf.gross_exposure)}</p>
-        </div>
-        <div className="bg-slate-50 dark:bg-surface rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
+        </Card>
+        <Card className="p-4">
           <p className="text-slate-500 dark:text-slate-400">{t.portfolio.netExposure}</p>
           <p className="text-xl font-bold">{fmtPct(pf.net_exposure)}</p>
-        </div>
-        <div className="bg-slate-50 dark:bg-surface rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
+        </Card>
+        <Card className="p-4">
           <p className="text-slate-500 dark:text-slate-400">{t.dashboard.dailyPnl}</p>
           <p className={`text-xl font-bold ${pnlColor(pf.daily_pnl)}`}>
             {fmtCurrency(pf.daily_pnl)} ({fmtPct(pf.daily_pnl_pct)})
           </p>
-        </div>
+        </Card>
       </div>
 
-      <div className="bg-slate-50 dark:bg-surface rounded-xl p-5 overflow-x-auto border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
+      <Card className="p-5 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-slate-500 border-b border-slate-200 dark:border-surface-light">
@@ -81,7 +81,7 @@ export function PortfolioPage() {
         {pf.positions.length === 0 && (
           <p className="text-center text-slate-500 py-8">{t.portfolio.noPositions}</p>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

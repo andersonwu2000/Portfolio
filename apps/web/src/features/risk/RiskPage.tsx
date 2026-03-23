@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { useApi, useWs } from "@core/hooks";
 import { fmtDate, fmtTime, fmtNum, translateApiError } from "@core/utils";
-import { StatusBadge, ErrorAlert, InfoTooltip, useToast } from "@shared/ui";
+import { Card, StatusBadge, ErrorAlert, InfoTooltip, useToast } from "@shared/ui";
 import { useT } from "@core/i18n";
 import { useAuth } from "@core/auth";
 import { ShieldOff } from "lucide-react";
@@ -89,7 +89,7 @@ export function RiskPage() {
 
       {rulesError && <ErrorAlert message={rulesError} onRetry={refreshRules} />}
       {!rulesError && (
-        <div className="bg-slate-50 dark:bg-surface rounded-xl p-5 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
+        <Card className="p-5">
           <p className="text-base font-semibold text-slate-500 dark:text-slate-400 mb-3">{t.risk.riskRules}</p>
           <div className="space-y-2">
             {rules?.map((r) => {
@@ -128,12 +128,12 @@ export function RiskPage() {
               );
             })}
           </div>
-        </div>
+        </Card>
       )}
 
       {alertsError && <ErrorAlert message={alertsError} onRetry={refreshAlerts} />}
       {!alertsError && (
-        <div className="bg-slate-50 dark:bg-surface rounded-xl p-5 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none" role="alert" aria-live="polite">
+        <Card className="p-5" role="alert" aria-live="polite">
           <p className="text-base font-semibold text-slate-500 dark:text-slate-400 mb-3">{t.risk.recentAlerts}</p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -168,7 +168,7 @@ export function RiskPage() {
               <p className="text-center text-slate-500 py-8">{t.risk.noAlerts}</p>
             )}
           </div>
-        </div>
+        </Card>
       )}
     </div>
   );

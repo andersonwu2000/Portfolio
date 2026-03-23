@@ -50,8 +50,13 @@ test.describe("Orders page", () => {
     const priceInput = form.locator('input[type="number"]').nth(1);
     await priceInput.fill("250");
 
-    // Submit
+    // Submit — opens confirmation dialog
     await form.locator('button[type="submit"]').click();
+
+    // Click Confirm in the confirmation dialog
+    const confirmBtn = page.locator("button", { hasText: /confirm/i });
+    await expect(confirmBtn).toBeVisible({ timeout: 5_000 });
+    await confirmBtn.click();
 
     // Toast notification should appear
     await expect(page.getByText(/order submitted|success/i)).toBeVisible({

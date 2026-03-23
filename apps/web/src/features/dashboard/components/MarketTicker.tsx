@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useWs } from "@core/hooks";
 import { fmtPrice } from "@core/utils";
 import { useT } from "@core/i18n";
+import { Card } from "@shared/ui";
 
 interface MarketItem {
   symbol: string;
@@ -78,7 +79,7 @@ export function MarketTicker() {
   if (list.length === 0) return null;
 
   return (
-    <div className="bg-slate-50 dark:bg-surface rounded-xl px-4 py-3 overflow-hidden border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
+    <Card className="px-4 py-3 overflow-hidden">
       <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">{t.dashboard.marketTicker}</p>
       <div className="flex gap-6 overflow-x-auto scrollbar-hide">
         {list.map((item) => {
@@ -107,6 +108,6 @@ export function MarketTicker() {
           );
         })}
       </div>
-    </div>
+    </Card>
   );
 }

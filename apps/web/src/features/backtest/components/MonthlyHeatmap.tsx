@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useT } from "@core/i18n";
+import { Card } from "@shared/ui";
 import type { NavPoint } from "@core/api";
 
 interface MonthlyReturn {
@@ -93,7 +94,7 @@ export function MonthlyHeatmap({ data }: { data: NavPoint[] }) {
   if (years.length === 0) return null;
 
   return (
-    <div className="bg-slate-50 dark:bg-surface rounded-xl p-5 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
+    <Card className="p-5">
       <p className="text-base font-semibold text-slate-500 dark:text-slate-400 mb-3">{t.backtest.monthlyReturns}</p>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
@@ -137,6 +138,6 @@ export function MonthlyHeatmap({ data }: { data: NavPoint[] }) {
           </tbody>
         </table>
       </div>
-    </div>
+    </Card>
   );
 }

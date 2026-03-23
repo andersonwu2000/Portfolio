@@ -3,6 +3,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import { useT } from "@core/i18n";
 import { useTheme } from "@core/theme";
 import { getChartColors } from "@shared/utils/chartColors";
+import { Card } from "@shared/ui";
 
 interface Props {
   data: { time: string; nav: number }[];
@@ -13,7 +14,7 @@ export const NavChart = memo(function NavChart({ data }: Props) {
   const { isDark } = useTheme();
   const c = getChartColors(isDark);
   return (
-    <div className="bg-slate-50 dark:bg-surface rounded-xl p-5 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
+    <Card className="p-5">
       <p className="text-base font-semibold text-slate-500 dark:text-slate-400 mb-3">{t.dashboard.navRealtime}</p>
       <ResponsiveContainer width="100%" height={260}>
         <LineChart data={data}>
@@ -24,6 +25,6 @@ export const NavChart = memo(function NavChart({ data }: Props) {
           <Line type="monotone" dataKey="nav" stroke="#3b82f6" strokeWidth={2} dot={false} isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
-    </div>
+    </Card>
   );
 });

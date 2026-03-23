@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { fmtCurrency, fmtPrice, fmtPct, pnlColor } from "@core/utils";
 import { useT } from "@core/i18n";
+import { Card } from "@shared/ui";
 import type { Position } from "@core/api";
 
 const DEFAULT_LIMIT = 10;
@@ -12,7 +13,7 @@ export function PositionTable({ positions }: { positions: Position[] }) {
   const hasMore = positions.length > DEFAULT_LIMIT;
 
   return (
-    <div className="bg-slate-50 dark:bg-surface rounded-xl p-5 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
+    <Card className="p-5">
       <p className="text-base font-semibold text-slate-500 dark:text-slate-400 mb-3">{t.dashboard.topPositions}</p>
       <table className="w-full text-sm">
         <thead>
@@ -46,6 +47,6 @@ export function PositionTable({ positions }: { positions: Position[] }) {
           {showAll ? t.dashboard.showLess : `${t.dashboard.showAll} (${positions.length})`}
         </button>
       )}
-    </div>
+    </Card>
   );
 }

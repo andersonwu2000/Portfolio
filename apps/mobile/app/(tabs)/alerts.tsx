@@ -1,6 +1,7 @@
 import { View, Text, FlatList, RefreshControl, Pressable, Alert, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAlerts } from "../../src/hooks/useAlerts";
+import { useAuth } from "../../src/hooks/useAuth";
 import { AlertItem } from "../../src/components/AlertItem";
 import { risk } from "@quant/shared";
 import { useT } from "@/src/i18n";
@@ -11,10 +12,8 @@ const ALERT_ITEM_HEIGHT = 56; // padding 12*2 + content ~24 + marginBottom 8
 export default function AlertsScreen() {
   const { t } = useT();
   const { alerts, loading, refresh } = useAlerts();
+  const { hasRole } = useAuth();
 
-  // TODO: killSwitch requires risk_manager role on backend but mobile has no
-  // role-based UI gating yet. The backend will reject unauthorized requests,
-  // but ideally the UI should hide/disable the button for insufficient roles.
   const handleKillSwitch = () => {
     Alert.alert(
       t.risk.killSwitch,
@@ -53,14 +52,16 @@ export default function AlertsScreen() {
         }
         ListEmptyComponent={<Text style={styles.empty}>{t.risk.noAlerts}</Text>}
         ListFooterComponent={
-          <Pressable
-            style={styles.killButton}
-            onLongPress={handleKillSwitch}
-            delayLongPress={1000}
-          >
-            <Text style={styles.killText}>{t.risk.killSwitch.toUpperCase()}</Text>
-            <Text style={styles.killHint}>{t.common.longPressHint}</Text>
-          </Pressable>
+          hasRole("risk_manager") ? (
+            <Pressable
+              style={styles.killButton}
+              onLongPress={handleKillSwitch}
+              delayLongPress={1000}
+            >
+              <Text style={styles.killText}>{t.risk.killSwitch.toUpperCase()}</Text>
+              <Text style={styles.killHint}>{t.common.longPressHint}</Text>
+            </Pressable>
+          ) : null
         }
         contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
       />
