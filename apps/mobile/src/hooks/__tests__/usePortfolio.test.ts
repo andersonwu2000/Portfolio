@@ -12,16 +12,20 @@ jest.mock("@quant/shared", () => ({
   })),
 }));
 
-// Mock react-native AppState
+// Mock react-native: selectively override AppState without spreading the full
+// module (which triggers lazy getters that require unavailable TurboModules).
+const mockAppState = {
+  addEventListener: jest.fn(() => ({ remove: jest.fn() })),
+  currentState: "active" as string,
+};
 jest.mock("react-native", () => {
-  const rn = jest.requireActual("react-native");
-  return {
-    ...rn,
-    AppState: {
-      addEventListener: jest.fn(() => ({ remove: jest.fn() })),
-      currentState: "active",
-    },
-  };
+  const rn = jest.requireActual("react-native/index");
+  // Only override specific properties to avoid triggering lazy getters
+  Object.defineProperty(rn, "AppState", {
+    get: () => mockAppState,
+    configurable: true,
+  });
+  return rn;
 });
 
 import { usePortfolio } from "../usePortfolio";

@@ -1,7 +1,13 @@
 /**
  * Jest test setup for mobile app.
  * Mocks platform-specific modules that are unavailable in the test environment.
+ *
+ * This runs as setupFilesAfterEnv (after the test framework is initialized).
+ * react-native/jest/setup.js handles core RN component mocks via setupFiles.
  */
+
+// Ensure React act() environment is set up
+(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
 // Mock expo-router
 jest.mock("expo-router", () => ({
@@ -69,6 +75,14 @@ jest.mock("react-native-reanimated", () => {
   Reanimated.default.call = () => {};
   return Reanimated;
 });
+
+// Mock expo-network (if used)
+jest.mock("expo-network", () => ({
+  getNetworkStateAsync: jest.fn(() =>
+    Promise.resolve({ isConnected: true, isInternetReachable: true })
+  ),
+  NetworkStateType: { WIFI: "WIFI", CELLULAR: "CELLULAR" },
+}));
 
 // Mock global fetch
 (globalThis as Record<string, unknown>).fetch = jest.fn(() =>

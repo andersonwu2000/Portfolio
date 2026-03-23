@@ -1,4 +1,5 @@
 import { Plus, X } from "lucide-react";
+import { useT } from "@core/i18n";
 
 interface Props {
   params: Record<string, unknown>;
@@ -6,6 +7,7 @@ interface Props {
 }
 
 export function ParamsEditor({ params, onChange }: Props) {
+  const { t } = useT();
   const entries = Object.entries(params);
 
   const addParam = () => {
@@ -36,13 +38,13 @@ export function ParamsEditor({ params, onChange }: Props) {
   return (
     <div className="col-span-full space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-sm text-slate-400">Strategy Parameters</span>
+        <span className="text-sm text-slate-400">{t.backtest.strategyParams}</span>
         <button
           type="button"
           onClick={addParam}
           className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
         >
-          <Plus size={12} /> Add
+          <Plus size={12} /> {t.backtest.addParam}
         </button>
       </div>
       {entries.map(([key, value]) => (
@@ -50,13 +52,13 @@ export function ParamsEditor({ params, onChange }: Props) {
           <input
             value={key}
             onChange={(e) => updateKey(key, e.target.value)}
-            placeholder="key"
+            placeholder={t.backtest.paramKey}
             className="w-1/3 bg-surface-dark border border-surface-light rounded-lg px-3 py-1.5 text-sm"
           />
           <input
             value={String(value)}
             onChange={(e) => updateValue(key, e.target.value)}
-            placeholder="value"
+            placeholder={t.backtest.paramValue}
             className="flex-1 bg-surface-dark border border-surface-light rounded-lg px-3 py-1.5 text-sm"
           />
           <button

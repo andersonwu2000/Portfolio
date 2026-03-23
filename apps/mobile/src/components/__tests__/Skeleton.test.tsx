@@ -3,7 +3,9 @@ import { render } from "@testing-library/react-native";
 import { Skeleton, MetricCardSkeleton } from "../Skeleton";
 
 // Mock Animated to avoid native animation issues in tests
-jest.mock("react-native/Libraries/Animated/NativeAnimatedHelper");
+jest.mock("react-native/Libraries/Animated/NativeAnimatedHelper", () => ({}), {
+  virtual: true,
+});
 
 describe("Skeleton", () => {
   it("renders without crashing", () => {

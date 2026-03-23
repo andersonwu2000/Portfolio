@@ -150,6 +150,10 @@ export const en = {
     year: "Year",
     yearly: "Yearly",
     exportTrades: "Export Trades",
+    strategyParams: "Strategy Parameters",
+    addParam: "Add",
+    paramKey: "key",
+    paramValue: "value",
   },
 
   // risk

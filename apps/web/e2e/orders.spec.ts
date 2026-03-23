@@ -1,8 +1,10 @@
 import { test, expect } from "@playwright/test";
+import { setupApiMocks } from "./mocks/handlers";
 
-async function loginViaStorage(page: import("@playwright/test").Page) {
-  await page.goto("/");
-  await page.evaluate(() => {
+async function loginAndSetup(page: import("@playwright/test").Page) {
+  await setupApiMocks(page);
+  await page.addInitScript(() => {
+    localStorage.setItem("quant_api_key", "test-key");
     localStorage.setItem("quant_authenticated", "true");
     localStorage.setItem("quant_user_role", "admin");
   });
@@ -11,7 +13,7 @@ async function loginViaStorage(page: import("@playwright/test").Page) {
 
 test.describe("Orders page", () => {
   test("navigate to orders → see order table", async ({ page }) => {
-    await loginViaStorage(page);
+    await loginAndSetup(page);
 
     // Page heading
     await expect(page.locator("h2")).toHaveText(/order/i, { timeout: 10_000 });
@@ -27,7 +29,7 @@ test.describe("Orders page", () => {
   test("fill order form → submit → success toast appears", async ({
     page,
   }) => {
-    await loginViaStorage(page);
+    await loginAndSetup(page);
 
     // Open the order form — click "New Order" button
     const newOrderBtn = page.locator("button", { hasText: /new order/i });

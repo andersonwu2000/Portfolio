@@ -1,8 +1,10 @@
 import { test, expect } from "@playwright/test";
+import { setupApiMocks } from "./mocks/handlers";
 
-async function loginViaStorage(page: import("@playwright/test").Page) {
-  await page.goto("/");
-  await page.evaluate(() => {
+async function loginAndSetup(page: import("@playwright/test").Page) {
+  await setupApiMocks(page);
+  await page.addInitScript(() => {
+    localStorage.setItem("quant_api_key", "test-key");
     localStorage.setItem("quant_authenticated", "true");
     localStorage.setItem("quant_user_role", "admin");
   });
@@ -13,7 +15,7 @@ test.describe("Backtest page", () => {
   test("fill form → submit → see metric cards with results", async ({
     page,
   }) => {
-    await loginViaStorage(page);
+    await loginAndSetup(page);
 
     // Page heading
     await expect(page.locator("h2").first()).toHaveText(/backtest/i, {

@@ -152,6 +152,10 @@ export const zh: Translations = {
     year: "年度",
     yearly: "全年",
     exportTrades: "匯出交易",
+    strategyParams: "策略參數",
+    addParam: "新增",
+    paramKey: "參數名稱",
+    paramValue: "值",
   },
 
   // risk

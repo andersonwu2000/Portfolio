@@ -1,13 +1,15 @@
 import { test, expect } from "@playwright/test";
+import { setupApiMocks } from "./mocks/handlers";
 
 /**
- * Set localStorage keys so the app considers the user authenticated.
- * Must be called after page.goto() to a page on the same origin,
- * then we reload so the app picks up the new state.
+ * Set up API mocks and localStorage keys so the app considers the user authenticated.
+ * Uses page.addInitScript to set localStorage before any app code runs,
+ * then sets up Playwright route mocks for all API endpoints.
  */
-async function loginViaStorage(page: import("@playwright/test").Page) {
-  await page.goto("/");
-  await page.evaluate(() => {
+async function loginAndSetup(page: import("@playwright/test").Page) {
+  await setupApiMocks(page);
+  await page.addInitScript(() => {
+    localStorage.setItem("quant_api_key", "test-key");
     localStorage.setItem("quant_authenticated", "true");
     localStorage.setItem("quant_user_role", "admin");
   });
@@ -18,7 +20,7 @@ test.describe("Smoke tests", () => {
   test("login → dashboard shows NAV, Cash, Positions metrics", async ({
     page,
   }) => {
-    await loginViaStorage(page);
+    await loginAndSetup(page);
 
     // Dashboard heading should be visible
     await expect(page.locator("h2")).toBeVisible({ timeout: 10_000 });
@@ -30,7 +32,7 @@ test.describe("Smoke tests", () => {
   });
 
   test("navigate to each page via sidebar links", async ({ page }) => {
-    await loginViaStorage(page);
+    await loginAndSetup(page);
 
     const navLinks = [
       { path: "/portfolio", heading: /portfolio/i },
@@ -50,7 +52,7 @@ test.describe("Smoke tests", () => {
   });
 
   test("logout redirects to settings (login) page", async ({ page }) => {
-    await loginViaStorage(page);
+    await loginAndSetup(page);
 
     // Click the logout button
     const logoutButton = page.locator("aside button").filter({ has: page.locator("svg") }).first();
