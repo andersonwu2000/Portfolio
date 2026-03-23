@@ -262,41 +262,45 @@ YahooFeed (src/data/sources/yahoo.py)
 
 ---
 
-## 6. 建議方案
+## 6. 建議方案與實施進度
 
 ### 策略：多源分層
 
-本專案同時面向台股和美股，無單一資料源可涵蓋所有需求。建議分層整合：
+本專案同時面向台股和美股，無單一資料源可涵蓋所有需求。分層整合：
 
 ```
-Layer 0 — 現有（免費，零遷移成本）
-└── Yahoo Finance (YahooFeed) — 基礎 OHLCV，已有快取和品質檢查
+Layer 0 — 基礎 OHLCV（✅ 已完成）
+└── Yahoo Finance (YahooFeed) — 全球 OHLCV + ParquetDiskCache + LRU
+└── FinMind (FinMindFeed) — 台股 OHLCV + .TW/.TWO 自動轉換
+└── create_feed() 工廠函式自動切換
 
-Layer 1 — 台股基本面（免費，低整合成本）
-└── FinMind — P/E、P/B、ROE、月營收、法人買賣超、財報三表
-    → 新增 FinMindFeed 或 FundamentalsProvider 介面
+Layer 1 — 台股基本面（✅ 已完成）
+└── FinMind (FinMindFundamentals) — P/E、P/B、ROE、月營收、股利、產業分類
+└── FundamentalsProvider ABC + Context.fundamentals()/sector() 整合
+└── multi_factor 和 sector_rotation 策略已升級使用真實基本面
 
-Layer 2 — 去存活者偏差 + 全球覆蓋（~$83/月）
+Layer 2 — 去存活者偏差 + 全球覆蓋（🔲 未實作，~$83/月）
 └── EODHD All-in-One — 下市公司數據、30 年基本面、70+ 交易所含台股
     → 新增 EODHDFeed，可逐步取代 YahooFeed 作為主要價格源
 
 Layer 3（未來）— 機構級台股研究
 └── TEJ — 需學術/機構預算時升級
-    → point-in-time 成分股、最完整台股財報
 
 Layer 4（未來）— 實盤交易
 └── Interactive Brokers — 數據+執行一體化（台+美）
-    → 實盤階段再整合
 ```
 
-### 遷移成本評估
+### 已完成的整合
 
-**低**。現有架構已良好抽象：
-
-1. `DataFeed` ABC 定義清晰介面
-2. 新增資料源 = 在 `src/data/sources/` 建新檔案，子類化 `DataFeed`
-3. 輸出約定簡單：`DataFrame[open, high, low, close, volume]` + `DatetimeIndex`
-4. 基本面數據需新介面（`DataFeed` 目前僅處理 OHLCV）
+| 資料源 | 模組 | 功能 |
+|--------|------|------|
+| Yahoo Finance | `src/data/sources/yahoo.py` | 全球 OHLCV + ParquetDiskCache + LRU |
+| FinMind OHLCV | `src/data/sources/finmind.py` | 台股日 K + .TW/.TWO 後綴處理 |
+| FinMind 基本面 | `src/data/sources/finmind_fundamentals.py` | PE/PB/ROE/月營收/股利/產業 |
+| 共用工具 | `src/data/sources/finmind_common.py` | strip/ensure_tw_suffix, get_dataloader |
+| 共用快取 | `src/data/sources/parquet_cache.py` | ParquetDiskCache (Yahoo + FinMind 共用) |
+| 基本面 ABC | `src/data/fundamentals.py` | FundamentalsProvider 介面 |
+| 工廠函式 | `src/data/sources/__init__.py` | create_feed() + create_fundamentals() |
 
 ### 各策略對資料源的需求
 
@@ -306,63 +310,10 @@ Layer 4（未來）— 實盤交易
 | `mean_reversion` | ✓ 足夠 | — | — | — |
 | `rsi_oversold` | ✓ 足夠 | — | — | — |
 | `ma_crossover` | ✓ 足夠 | — | — | — |
-| `pairs_trading` | ✓ 基本 | ✓ 產業配對 | — | — |
-| **`multi_factor`** | **✗ 缺基本面** | **✓ P/E、P/B、ROE** | ✓ 全球基本面 | ✓✓ 最完整 |
-| **`sector_rotation`** | **✗ 缺產業分類** | **✓ 產業分類** | ✓ 產業分類 | ✓✓ 細分產業 |
+| `pairs_trading` | ✓ 基本 | ✅ 產業配對 | — | — |
+| **`multi_factor`** | ✗ 缺基本面 | **✅ P/E、P/B、ROE** | ✓ 全球基本面 | ✓✓ 最完整 |
+| **`sector_rotation`** | ✗ 缺產業分類 | **✅ 產業分類** | ✓ 產業分類 | ✓✓ 細分產業 |
 
-### 立即可行方案（免費）
+### 下一步付費升級
 
-**Yahoo Finance + FinMind + TWSE OpenAPI** — 零成本解決基本面和產業分類需求。
-
-### 最佳單一付費升級
-
-**EODHD All-in-One ~$83/月** — 一次解決：去存活者偏差 + 全球基本面 + 台股覆蓋 + 日內數據。
-
-### 最低成本美股強化
-
-**Tiingo $7-29/月** 或 **Polygon $29/月** — 高品質美股數據，但不覆蓋台股。
-
----
-
-## 附錄：整合程式碼示意
-
-### 新增 FinMind 資料源
-
-```python
-# src/data/sources/finmind.py
-from finmind.data import DataLoader
-from src.data.feed import DataFeed
-
-class FinMindFeed(DataFeed):
-    def __init__(self, universe: list[str], token: str = ""):
-        self._dl = DataLoader()
-        if token:
-            self._dl.login_by_token(api_token=token)
-        self._universe = universe
-
-    def get_bars(self, symbol: str, start: str, end: str) -> pd.DataFrame:
-        df = self._dl.taiwan_stock_daily(
-            stock_id=symbol, start_date=start, end_date=end
-        )
-        # 轉換欄位名至標準格式 ...
-```
-
-### 新增基本面介面
-
-```python
-# src/data/fundamentals.py
-from abc import ABC, abstractmethod
-
-class FundamentalsProvider(ABC):
-    @abstractmethod
-    def get_financials(self, symbol: str) -> dict:
-        """取得最新財報數據（P/E、P/B、ROE、EPS 等）。"""
-
-    @abstractmethod
-    def get_sector(self, symbol: str) -> str:
-        """取得產業分類。"""
-
-    @abstractmethod
-    def get_dividends(self, symbol: str, start: str, end: str) -> pd.DataFrame:
-        """取得股利歷史。"""
-```
+**EODHD All-in-One ~$83/月** — 去存活者偏差 + 全球基本面 + 台股覆蓋 + 日內數據。目前回測年化報酬因存活者偏差可能高估 2-5%，EODHD 的下市公司數據可解決此問題。
