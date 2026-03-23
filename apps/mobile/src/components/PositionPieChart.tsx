@@ -1,16 +1,17 @@
+import { useMemo } from "react";
 import { View, StyleSheet } from "react-native";
 import { VictoryPie } from "victory-native";
-import { surface, textPrimary } from "@/src/theme/colors";
+import { surface, textPrimary, blue, success, warning, danger } from "@/src/theme/colors";
 
 interface Props {
   positions: { symbol: string; weight: number }[];
 }
 
 const PALETTE = [
-  "#3B82F6", // blue
-  "#22C55E", // green
-  "#F59E0B", // amber
-  "#EF4444", // red
+  blue,
+  success,
+  warning,
+  danger,
   "#8B5CF6", // violet
   "#06B6D4", // cyan
   "#EC4899", // pink
@@ -22,22 +23,18 @@ const PALETTE = [
 const CHART_SIZE = 220;
 
 export function PositionPieChart({ positions }: Props) {
-  if (positions.length === 0) return null;
+  const slices = useMemo(() => {
+    if (positions.length === 0) return [];
+    const sorted = positions.slice().sort((a, b) => Math.abs(b.weight) - Math.abs(a.weight));
+    const top = sorted.slice(0, 9);
+    const rest = sorted.slice(9);
+    const otherWeight = rest.reduce((sum, p) => sum + Math.abs(p.weight), 0);
+    const s = top.map((p) => ({ x: p.symbol, y: Math.abs(p.weight) }));
+    if (otherWeight > 0) s.push({ x: "Other", y: otherWeight });
+    return s;
+  }, [positions]);
 
-  // Take top 10 by weight, group rest as "Other"
-  const sorted = positions.slice().sort((a, b) => Math.abs(b.weight) - Math.abs(a.weight));
-  const top = sorted.slice(0, 9);
-  const rest = sorted.slice(9);
-  const otherWeight = rest.reduce((sum, p) => sum + Math.abs(p.weight), 0);
-
-  const slices = top.map((p) => ({
-    x: p.symbol,
-    y: Math.abs(p.weight),
-  }));
-
-  if (otherWeight > 0) {
-    slices.push({ x: "Other", y: otherWeight });
-  }
+  if (slices.length === 0) return null;
 
   return (
     <View style={styles.container}>

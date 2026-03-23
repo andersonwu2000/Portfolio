@@ -68,11 +68,11 @@ export default function App() {
   return (
     <ErrorBoundary>
       <ToastProvider>
-      <ThemeProvider>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
-      </ThemeProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <AppContent />
+          </AuthProvider>
+        </ThemeProvider>
       </ToastProvider>
     </ErrorBoundary>
   );

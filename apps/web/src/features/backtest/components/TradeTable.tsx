@@ -1,15 +1,7 @@
 import { useT } from "@core/i18n";
 import { ExportButton } from "@shared/ui";
 import { fmtCurrency, fmtNum } from "@core/utils";
-
-export interface TradeRecord {
-  date: string;
-  symbol: string;
-  side: string;
-  quantity: number;
-  price: number;
-  commission: number;
-}
+import type { TradeRecord } from "@quant/shared";
 
 interface Props {
   trades: TradeRecord[];

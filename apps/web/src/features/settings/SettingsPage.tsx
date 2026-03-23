@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useApi } from "@core/hooks";
 import { isAuthenticated, login } from "@core/api";
+import { fmtUptime } from "@core/utils";
 import { MetricCard, MetricCardSkeleton, useToast } from "@shared/ui";
 import { useT } from "@core/i18n";
 import { useAuth } from "@core/auth";
@@ -38,12 +39,6 @@ export function SettingsPage({ onSave }: { onSave?: () => void } = {}) {
     } finally {
       setLoginLoading(false);
     }
-  };
-
-  const fmtUptime = (s: number) => {
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    return h > 0 ? `${h}h ${m}m` : `${m}m`;
   };
 
   return (

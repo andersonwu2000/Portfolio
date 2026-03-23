@@ -13,7 +13,6 @@ import { ResultChart } from "./components/ResultChart";
 import { DrawdownChart } from "./components/DrawdownChart";
 import { MonthlyHeatmap } from "./components/MonthlyHeatmap";
 import { TradeTable } from "./components/TradeTable";
-import type { TradeRecord } from "./components/TradeTable";
 import { ParamsEditor } from "./components/ParamsEditor";
 import { HistoryPanel } from "./components/HistoryPanel";
 import { CompareTable } from "./components/CompareTable";
@@ -217,8 +216,8 @@ export function BacktestPage() {
               {analysisTab === "drawdown" && <DrawdownChart data={result.nav_series} />}
               {analysisTab === "monthly" && <MonthlyHeatmap data={result.nav_series} />}
               {analysisTab === "trades" && (
-                (result as unknown as Record<string, unknown>).trades
-                  ? <TradeTable trades={(result as unknown as { trades: TradeRecord[] }).trades} />
+                result.trades
+                  ? <TradeTable trades={result.trades} />
                   : <div className="bg-surface rounded-xl p-5 text-sm text-slate-400">{t.common.noData}</div>
               )}
             </>

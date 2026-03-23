@@ -1,11 +1,7 @@
 import { useMemo } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { useT } from "@core/i18n";
-
-interface NavPoint {
-  date: string;
-  nav: number;
-}
+import type { NavPoint } from "@quant/shared";
 
 interface DrawdownPoint {
   date: string;

@@ -9,7 +9,7 @@ interface Props {
 }
 
 type BT = Translations["backtest"];
-type NumericKey = { [K in keyof BacktestResult]: BacktestResult[K] extends number ? K : never }[keyof BacktestResult];
+type NumericKey = { [K in keyof BacktestResult]-?: BacktestResult[K] extends number ? K : never }[keyof BacktestResult];
 const metricsDef: { key: NumericKey; labelKey: keyof BT; fmt: (v: number) => string }[] = [
   { key: "total_return", labelKey: "totalReturn", fmt: fmtPct },
   { key: "annual_return", labelKey: "annualReturn", fmt: fmtPct },

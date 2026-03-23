@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useApi } from "@core/hooks";
 import { useT } from "@core/i18n";
+import { fmtUptime } from "@core/utils";
 import { MetricCard, MetricCardSkeleton } from "@shared/ui";
 import { systemApi } from "../api";
 
@@ -12,8 +13,13 @@ export function SystemMetrics() {
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
 
   useEffect(() => {
-    intervalRef.current = setInterval(refresh, REFRESH_INTERVAL_MS);
-    return () => clearInterval(intervalRef.current);
+    const start = () => { intervalRef.current = setInterval(refresh, REFRESH_INTERVAL_MS); };
+    const stop = () => clearInterval(intervalRef.current);
+    const onVisibility = () => { document.hidden ? stop() : start(); };
+
+    start();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => { stop(); document.removeEventListener("visibilitychange", onVisibility); };
   }, [refresh]);
 
   if (loading && !metrics) {
@@ -28,12 +34,6 @@ export function SystemMetrics() {
   }
 
   if (!metrics) return null;
-
-  const fmtUptime = (s: number) => {
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    return h > 0 ? `${h}h ${m}m` : `${m}m`;
-  };
 
   return (
     <div>

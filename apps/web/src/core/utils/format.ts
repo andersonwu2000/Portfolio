@@ -1,5 +1,5 @@
 // Re-export platform-agnostic formatters from shared
-export { fmtCurrency, fmtPct, fmtNum, fmtDate, fmtTime } from "@quant/shared";
+export { fmtCurrency, fmtPct, fmtNum, fmtDate, fmtTime, fmtUptime } from "@quant/shared";
 
 // Web-specific: Tailwind CSS class helpers (not shareable with mobile)
 export function pnlColor(v: number): string {

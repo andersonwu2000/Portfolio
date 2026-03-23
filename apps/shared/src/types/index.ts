@@ -78,6 +78,20 @@ export interface BacktestSummary {
   error: string | null;
 }
 
+export interface NavPoint {
+  date: string;
+  nav: number;
+}
+
+export interface TradeRecord {
+  date: string;
+  symbol: string;
+  side: string;
+  quantity: number;
+  price: number;
+  commission: number;
+}
+
 export interface BacktestResult {
   strategy_name: string;
   start_date: string;
@@ -94,7 +108,8 @@ export interface BacktestResult {
   total_trades: number;
   win_rate: number;
   total_commission: number;
-  nav_series: { date: string; nav: number }[] | null;
+  nav_series: NavPoint[] | null;
+  trades?: TradeRecord[];
 }
 
 export interface RiskRule {

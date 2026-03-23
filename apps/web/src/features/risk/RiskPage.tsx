@@ -48,7 +48,7 @@ export function RiskPage() {
       refreshRules();
       toast("success", t.toast.ruleSaved);
     } catch {
-      toast("error", t.toast.ruleSaved);
+      toast("error", t.common.requestFailed);
     } finally {
       setToggling(null);
     }

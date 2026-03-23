@@ -14,6 +14,8 @@ export type {
   SystemStatus,
   SystemMetrics,
   HealthCheck,
+  NavPoint,
+  TradeRecord,
 } from "./types";
 
 // API client
@@ -33,4 +35,4 @@ export { pollBacktestResult } from "./hooks/pollBacktestResult";
 export type { PollOptions, PollOutcome, PollSuccess, PollFailure } from "./hooks/pollBacktestResult";
 
 // Utils
-export { fmtCurrency, fmtPct, fmtNum, fmtDate, fmtTime } from "./utils/format";
+export { fmtCurrency, fmtPct, fmtNum, fmtDate, fmtTime, fmtUptime } from "./utils/format";

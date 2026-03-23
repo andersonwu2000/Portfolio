@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useWs } from "@core/hooks";
 import { useT } from "@core/i18n";
 
@@ -6,60 +6,69 @@ interface MarketItem {
   symbol: string;
   price: number;
   change_pct: number;
-  prev_price?: number;
 }
 
-type FlashState = Record<string, "up" | "down">;
+type FlashDir = "up" | "down";
+
+interface TickerState {
+  items: Record<string, MarketItem>;
+  flashes: Record<string, FlashDir>;
+}
 
 export function MarketTicker() {
   const { t } = useT();
-  const [items, setItems] = useState<Record<string, MarketItem>>({});
-  const [flashes, setFlashes] = useState<FlashState>({});
+  const [state, setState] = useState<TickerState>({ items: {}, flashes: {} });
   const flashTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      Object.values(flashTimers.current).forEach(clearTimeout);
+    };
+  }, []);
 
   const handleMessage = useCallback((data: unknown) => {
     const msg = data as { symbol?: string; price?: number; change_pct?: number };
     if (!msg?.symbol || msg.price == null) return;
+    const sym = msg.symbol;
 
-    setItems((prev) => {
-      const existing = prev[msg.symbol!];
-      const direction =
+    setState((prev) => {
+      const existing = prev.items[sym];
+      const direction: FlashDir | undefined =
         existing && msg.price! !== existing.price
-          ? msg.price! > existing.price
-            ? "up"
-            : "down"
+          ? msg.price! > existing.price ? "up" : "down"
           : undefined;
 
+      const nextFlashes = direction
+        ? { ...prev.flashes, [sym]: direction }
+        : prev.flashes;
+
       if (direction) {
-        setFlashes((f) => ({ ...f, [msg.symbol!]: direction }));
-        // Clear existing timer
-        if (flashTimers.current[msg.symbol!]) {
-          clearTimeout(flashTimers.current[msg.symbol!]);
-        }
-        flashTimers.current[msg.symbol!] = setTimeout(() => {
-          setFlashes((f) => {
-            const next = { ...f };
-            delete next[msg.symbol!];
-            return next;
+        if (flashTimers.current[sym]) clearTimeout(flashTimers.current[sym]);
+        flashTimers.current[sym] = setTimeout(() => {
+          if (!mountedRef.current) return;
+          setState((s) => {
+            if (!(sym in s.flashes)) return s;
+            const { [sym]: _, ...rest } = s.flashes;
+            return { ...s, flashes: rest };
           });
         }, 1000);
       }
 
       return {
-        ...prev,
-        [msg.symbol!]: {
-          symbol: msg.symbol!,
-          price: msg.price!,
-          change_pct: msg.change_pct ?? 0,
-          prev_price: existing?.price,
+        items: {
+          ...prev.items,
+          [sym]: { symbol: sym, price: msg.price!, change_pct: msg.change_pct ?? 0 },
         },
+        flashes: nextFlashes,
       };
     });
   }, []);
 
   useWs("market", handleMessage);
 
-  const list = Object.values(items);
+  const list = Object.values(state.items);
   if (list.length === 0) return null;
 
   return (
@@ -67,7 +76,7 @@ export function MarketTicker() {
       <p className="text-xs font-medium text-slate-400 mb-2">{t.dashboard.marketTicker}</p>
       <div className="flex gap-6 overflow-x-auto scrollbar-hide">
         {list.map((item) => {
-          const flash = flashes[item.symbol];
+          const flash = state.flashes[item.symbol];
           const isUp = item.change_pct >= 0;
           const colorClass = isUp ? "text-emerald-400" : "text-red-400";
           const flashBg = flash === "up"

@@ -1,10 +1,6 @@
 import { useMemo } from "react";
 import { useT } from "@core/i18n";
-
-interface NavPoint {
-  date: string;
-  nav: number;
-}
+import type { NavPoint } from "@quant/shared";
 
 interface MonthlyReturn {
   year: number;
@@ -36,8 +32,9 @@ function deriveMonthlyReturns(data: NavPoint[]): MonthlyReturn[] {
   const monthlyMap = new Map<string, { first: number; last: number }>();
 
   for (const point of data) {
-    const d = new Date(point.date);
-    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    const year = +point.date.slice(0, 4);
+    const month = +point.date.slice(5, 7) - 1;
+    const key = `${year}-${month}`;
     const existing = monthlyMap.get(key);
     if (!existing) {
       monthlyMap.set(key, { first: point.nav, last: point.nav });
