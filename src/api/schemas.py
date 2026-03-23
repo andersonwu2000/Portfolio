@@ -4,7 +4,6 @@ API 請求/回應模型 — Pydantic models → 自動生成 OpenAPI spec。
 
 from __future__ import annotations
 
-from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
 
 

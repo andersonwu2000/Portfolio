@@ -101,7 +101,7 @@ python -m src.cli.main backtest \
 
 | 參數 | 簡寫 | 預設值 | 說明 |
 |------|------|--------|------|
-| `--strategy` | `-s` | `momentum` | 策略名稱（`momentum` 或 `mean_reversion`） |
+| `--strategy` | `-s` | `momentum` | 策略名稱（見[內建策略](#5-內建策略)） |
 | `--universe` | `-u` | AAPL, MSFT, GOOGL, AMZN, META | 股票代碼，可重複指定多檔 |
 | `--start` | | `2020-01-01` | 回測起始日 |
 | `--end` | | `2024-12-31` | 回測結束日 |
@@ -206,6 +206,70 @@ python -m src.cli.main backtest -s momentum -u AAPL -u MSFT -u GOOGL -u AMZN -u 
 python -m src.cli.main backtest -s mean_reversion -u AAPL -u MSFT -u GOOGL -u AMZN -u META
 ```
 
+### RSI 超賣策略（rsi_oversold）
+
+**核心概念**：RSI 低於 30 代表超賣，股價可能反彈。
+
+具體做法：
+- 計算每檔股票的 14 日 RSI
+- 只買入 RSI < 30 的標的（超賣區間）
+- 信號強度 = 100 - RSI（RSI 越低，配置越多）
+
+```bash
+python -m src.cli.main backtest -s rsi_oversold -u AAPL -u MSFT -u GOOGL -u AMZN -u META
+```
+
+### 均線交叉策略（ma_crossover）
+
+**核心概念**：短期均線上穿長期均線時，代表趨勢轉多。
+
+具體做法：
+- 計算 10 日快線與 50 日慢線的比值
+- 快線 > 慢線時買入（比值 > 0）
+- 按交叉強度分配權重
+
+```bash
+python -m src.cli.main backtest -s ma_crossover -u AAPL -u MSFT -u GOOGL -u AMZN -u META
+```
+
+### 多因子策略（multi_factor）
+
+**核心概念**：結合動量、均值回歸、RSI 三個因子，綜合評分選股。
+
+具體做法：
+- 對每檔股票計算三個因子的百分位排名
+- 加權合成（動量 40%、價值 30%、品質 30%）
+- 只買入複合分數為正的標的
+
+```bash
+python -m src.cli.main backtest -s multi_factor -u AAPL -u MSFT -u GOOGL -u AMZN -u META
+```
+
+### 配對交易策略（pairs_trading）
+
+**核心概念**：兩檔相關股票的價格比率會回歸均值，偏離時買入被低估的一方。
+
+具體做法：
+- 對每一對股票計算價格比率的 Z-score
+- Z-score 超過閾值時，買入相對弱勢（被低估）的標的
+- 等權重配置
+
+```bash
+python -m src.cli.main backtest -s pairs_trading -u AAPL -u MSFT -u GOOGL -u AMZN -u META
+```
+
+### 板塊輪動策略（sector_rotation）
+
+**核心概念**：買入短期動量最強的標的，用風險平價分配權重。
+
+具體做法：
+- 計算 60 日短期動量，選出前 5 名
+- 按波動率的倒數分配權重（波動低的配置多），使風險貢獻相等
+
+```bash
+python -m src.cli.main backtest -s sector_rotation -u AAPL -u MSFT -u GOOGL -u AMZN -u META
+```
+
 ## 6. 撰寫你自己的策略
 
 撰寫策略只需要三步：
@@ -262,22 +326,18 @@ class MyStrategy(Strategy):
 
 ### Step 2：註冊策略
 
-打開 `src/cli/main.py`，找到 `_resolve_strategy` 函式，加入你的策略：
+打開 `src/cli/main.py` 和 `src/api/routes/backtest.py`，找到 `_resolve_strategy` 函式，加入你的策略：
 
 ```python
-def _resolve_strategy(name: str):
-    from strategies.momentum import MomentumStrategy
-    from strategies.mean_reversion import MeanReversionStrategy
-    from strategies.my_strategy import MyStrategy  # 加這行
+from strategies.my_strategy import MyStrategy  # 加這行
 
-    mapping = {
-        "momentum": MomentumStrategy,
-        "momentum_12_1": MomentumStrategy,
-        "mean_reversion": MeanReversionStrategy,
-        "my_strategy": MyStrategy,                  # 加這行
-    }
-    # ...
+mapping = {
+    # ... 現有策略 ...
+    "my_strategy": MyStrategy,                  # 加這行
+}
 ```
+
+> 詳細的策略開發說明（因子庫、最佳化器、常見模式）請參考 [strategies/README.md](../strategies/README.md) 或[開發者指南](developer-guide-zh.md)。
 
 ### Step 3：執行回測
 

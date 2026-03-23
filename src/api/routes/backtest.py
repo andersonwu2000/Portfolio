@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import traceback
 import uuid
-from collections import OrderedDict
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from slowapi import Limiter
@@ -20,6 +18,7 @@ from src.api.schemas import (
 )
 from src.api.state import get_app_state
 from src.backtest.engine import BacktestConfig, BacktestEngine
+from src.strategy.registry import resolve_strategy
 from src.config import get_config
 
 logger = logging.getLogger(__name__)
@@ -47,7 +46,7 @@ async def submit_backtest(request: Request, req: BacktestRequest, api_key: str =
 
     def _run():
         try:
-            strategy = _resolve_strategy(req.strategy, req.params)
+            strategy = resolve_strategy(req.strategy, req.params)
             bt_config = BacktestConfig(
                 universe=req.universe,
                 start=req.start,
@@ -180,25 +179,3 @@ async def get_backtest_result(task_id: str, api_key: str = Depends(verify_api_ke
     )
 
 
-def _resolve_strategy(name: str, params: dict):
-    """根據名稱解析策略類別。"""
-    from strategies.momentum import MomentumStrategy
-    from strategies.mean_reversion import MeanReversionStrategy
-
-    strategy_map = {
-        "momentum": MomentumStrategy,
-        "momentum_12_1": MomentumStrategy,
-        "mean_reversion": MeanReversionStrategy,
-    }
-
-    cls = strategy_map.get(name)
-    if cls is None:
-        raise ValueError(f"Unknown strategy: {name}. Available: {list(strategy_map.keys())}")
-
-    if params:
-        # Only pass params that match the constructor's declared parameters
-        import inspect
-        valid_params = set(inspect.signature(cls.__init__).parameters.keys()) - {"self"}
-        filtered = {k: v for k, v in params.items() if k in valid_params}
-        return cls(**filtered)
-    return cls()

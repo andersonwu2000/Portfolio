@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -54,17 +53,17 @@ class BacktestResult:
             f"Period:        {self.start_date} ~ {self.end_date}",
             f"Initial Cash:  ${self.initial_cash:,.0f}",
             f"Final NAV:     ${self.nav_series.iloc[-1]:,.0f}" if len(self.nav_series) > 0 else "",
-            f"",
+            "",
             f"Total Return:  {self.total_return:+.2%}",
             f"Annual Return: {self.annual_return:+.2%}",
             f"Volatility:    {self.volatility:.2%}",
             f"Sharpe Ratio:  {self.sharpe:.2f}",
             f"Sortino Ratio: {self.sortino:.2f}",
             f"Calmar Ratio:  {self.calmar:.2f}",
-            f"",
+            "",
             f"Max Drawdown:  {self.max_drawdown:.2%}",
             f"Max DD Days:   {self.max_drawdown_duration}",
-            f"",
+            "",
             f"Total Trades:  {self.total_trades}",
             f"Win Rate:      {self.win_rate:.1%}",
             f"Total Comm.:   ${self.total_commission:,.0f}",

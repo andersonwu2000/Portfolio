@@ -9,7 +9,6 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime, timezone
-from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -17,7 +16,7 @@ import pandas as pd
 import sqlalchemy as sa
 from sqlalchemy import event
 
-from src.domain.models import Trade, Side
+from src.domain.models import Trade
 
 if TYPE_CHECKING:
     from src.domain.models import RiskAlert

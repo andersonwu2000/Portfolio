@@ -2,7 +2,6 @@
 
 from decimal import Decimal
 
-import pytest
 
 from src.domain.models import Instrument, Order, OrderStatus, Portfolio, Position, Side
 from src.execution.oms import OrderManager, apply_trades

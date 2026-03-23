@@ -80,7 +80,12 @@ src/
 
 strategies/               # 用戶自定義策略
 ├── momentum.py           # 12-1 動量策略
-└── mean_reversion.py     # 均值回歸策略
+├── mean_reversion.py     # 均值回歸策略
+├── rsi_oversold.py       # RSI 超賣策略
+├── ma_crossover.py       # 均線交叉策略
+├── multi_factor.py       # 多因子複合策略
+├── pairs_trading.py      # 配對交易策略
+└── sector_rotation.py    # 板塊輪動策略
 
 apps/
 ├── web/                  # React 18 + Vite + Tailwind 儀表板
@@ -177,7 +182,13 @@ from strategies.my_strategy import MyStrategy   # <-- 新增 import
 
 mapping = {
     "momentum": MomentumStrategy,
+    "momentum_12_1": MomentumStrategy,
     "mean_reversion": MeanReversionStrategy,
+    "rsi_oversold": RsiOversoldStrategy,
+    "ma_crossover": MaCrossoverStrategy,
+    "pairs_trading": PairsTradingStrategy,
+    "multi_factor": MultiFactorStrategy,
+    "sector_rotation": SectorRotationStrategy,
     "my_strategy": MyStrategy,                  # <-- 新增對應
 }
 ```

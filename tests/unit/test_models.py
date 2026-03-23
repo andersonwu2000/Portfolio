@@ -2,7 +2,6 @@
 
 from decimal import Decimal
 
-import pytest
 
 from src.domain.models import (
     Instrument,
@@ -11,7 +10,6 @@ from src.domain.models import (
     Portfolio,
     Position,
     RiskDecision,
-    Side,
 )
 
 

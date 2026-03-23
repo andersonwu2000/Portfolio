@@ -11,11 +11,12 @@ from __future__ import annotations
 
 import logging
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Callable
+from typing import Callable, Literal
 
+import numpy as np
 import pandas as pd
 
 from src.backtest.analytics import BacktestResult, compute_analytics
@@ -40,7 +41,7 @@ class BacktestConfig:
     end: str = "2025-12-31"
     initial_cash: float = 10_000_000.0
     freq: str = "1d"
-    rebalance_freq: str = "daily"           # "daily", "weekly", "monthly"
+    rebalance_freq: Literal["daily", "weekly", "monthly"] = "daily"
     slippage_bps: float = 5.0
     commission_rate: float = 0.001425
     tax_rate: float = 0.003
@@ -62,6 +63,11 @@ class BacktestEngine:
         progress_callback: Callable[[int, int], None] | None = None,
     ) -> BacktestResult:
         """執行回測。"""
+        # 重置實例狀態，避免多次 run() 之間的狀態洩漏
+        self._price_matrix = pd.DataFrame()
+        self._volume_matrix = pd.DataFrame()
+        self._last_rebalance_month = -1
+
         run_id = uuid.uuid4().hex[:8]
         logger.info(
             "BACKTEST START [%s] strategy=%s, universe=%d symbols, %s ~ %s",
@@ -80,6 +86,9 @@ class BacktestEngine:
         feed = self._load_data(config)
         if not feed.get_universe():
             raise ValueError("No data loaded for any symbol in universe")
+
+        # 預建價格/成交量矩陣（向量化查詢）
+        self._build_matrices(feed, config.universe)
 
         # 2. 準備元件
         sim_broker = SimBroker(SimConfig(
@@ -110,7 +119,7 @@ class BacktestEngine:
             feed.set_current_date(bar_date)
 
             # 更新市場價格
-            prices = self._get_prices(feed, config.universe, bar_date)
+            prices = self._get_prices(config.universe, bar_date)
             portfolio.update_market_prices(prices)
             portfolio.as_of = bar_date
 
@@ -131,7 +140,7 @@ class BacktestEngine:
                     orders = weights_to_orders(target_weights, portfolio, prices)
 
                     # 風控檢查
-                    volumes = self._get_volumes(feed, config.universe, bar_date)
+                    volumes = self._get_volumes(config.universe, bar_date)
                     market_state = MarketState(prices=prices, daily_volumes=volumes)
                     approved = risk_engine.check_orders(orders, portfolio, market_state)
 
@@ -149,10 +158,6 @@ class BacktestEngine:
                     if trades:
                         portfolio = apply_trades(portfolio, trades)
                         rebalance_count += 1
-
-            # 更新每日收盤價
-            prices = self._get_prices(feed, config.universe, bar_date)
-            portfolio.update_market_prices(prices)
 
             # 記錄 NAV
             nav_history.append({
@@ -188,6 +193,10 @@ class BacktestEngine:
             result.max_drawdown * 100,
             result.total_trades,
         )
+
+        # 釋放矩陣記憶體
+        self._price_matrix = pd.DataFrame()
+        self._volume_matrix = pd.DataFrame()
 
         return result
 
@@ -238,46 +247,79 @@ class BacktestEngine:
         end = pd.Timestamp(config.end)
         return [d.to_pydatetime() for d in sorted_dates if start <= d <= end]
 
-    def _get_prices(
+    def _build_matrices(
         self,
         feed: HistoricalFeed,
         universe: list[str],
-        bar_date: datetime,
-    ) -> dict[str, Decimal]:
-        """取得指定日期的收盤價。"""
-        prices: dict[str, Decimal] = {}
+    ) -> None:
+        """預先建立價格與成交量矩陣，避免逐 symbol 逐 bar 查詢。"""
+        price_frames: dict[str, pd.Series] = {}
+        volume_frames: dict[str, pd.Series] = {}
         for symbol in universe:
             df = feed.get_bars(symbol)
             if df.empty:
                 continue
-            # 取 <= bar_date 的最近一筆
-            mask = df.index <= pd.Timestamp(bar_date)
-            if mask.any():
-                prices[symbol] = Decimal(str(round(df.loc[mask, "close"].iloc[-1], 4)))
-            else:
-                logger.debug("No price for %s on %s, skipping", symbol, bar_date)
+            price_frames[symbol] = df["close"]
+            if "volume" in df.columns:
+                volume_frames[symbol] = df["volume"]
+
+        if price_frames:
+            self._price_matrix = pd.DataFrame(price_frames).sort_index()
+            # Forward-fill so each date has the latest known price
+            self._price_matrix = self._price_matrix.ffill()
+        else:
+            self._price_matrix = pd.DataFrame()
+
+        if volume_frames:
+            self._volume_matrix = pd.DataFrame(volume_frames).sort_index()
+        else:
+            self._volume_matrix = pd.DataFrame()
+
+    @staticmethod
+    def _lookup_row(matrix: pd.DataFrame, ts: pd.Timestamp) -> pd.Series | None:
+        """O(log N) 查詢矩陣中 <= ts 的最近一列。"""
+        if matrix.empty:
+            return None
+        idx = matrix.index.searchsorted(ts, side="right") - 1
+        if idx < 0:
+            return None
+        return matrix.iloc[idx]
+
+    def _get_prices(
+        self,
+        universe: list[str],
+        bar_date: datetime,
+    ) -> dict[str, Decimal]:
+        """取得指定日期的收盤價（從預建矩陣查詢）。"""
+        row = self._lookup_row(self._price_matrix, pd.Timestamp(bar_date))
+        if row is None:
+            return {}
+        prices: dict[str, Decimal] = {}
+        for symbol in universe:
+            if symbol in row.index:
+                val = row[symbol]
+                if not np.isnan(val):
+                    prices[symbol] = Decimal(str(round(val, 4)))
+                else:
+                    logger.debug("No price for %s on %s, skipping", symbol, bar_date)
         return prices
 
     def _get_volumes(
         self,
-        feed: HistoricalFeed,
         universe: list[str],
         bar_date: datetime,
     ) -> dict[str, Decimal]:
-        """取得指定日期的成交量。"""
+        """取得指定日期的成交量（從預建矩陣查詢）。"""
+        row = self._lookup_row(self._volume_matrix, pd.Timestamp(bar_date))
+        if row is None:
+            return {}
         volumes: dict[str, Decimal] = {}
         for symbol in universe:
-            df = feed.get_bars(symbol)
-            if df.empty:
-                continue
-            mask = df.index <= pd.Timestamp(bar_date)
-            if mask.any() and "volume" in df.columns:
-                vol = df.loc[mask, "volume"].iloc[-1]
-                if vol > 0:
+            if symbol in row.index:
+                vol = row[symbol]
+                if not np.isnan(vol) and vol > 0:
                     volumes[symbol] = Decimal(str(int(vol)))
         return volumes
-
-    _last_rebalance_month: int = -1
 
     def _is_rebalance_day(
         self, bar_date: datetime, idx: int, freq: str

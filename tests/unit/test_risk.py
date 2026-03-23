@@ -2,13 +2,11 @@
 
 from decimal import Decimal
 
-import pytest
 
 from src.domain.models import Instrument, Order, Portfolio, Position, Side
 from src.risk.engine import RiskEngine
 from src.risk.rules import (
     MarketState,
-    daily_drawdown_limit,
     fat_finger_check,
     max_order_notional,
     max_position_weight,

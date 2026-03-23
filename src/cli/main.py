@@ -9,9 +9,7 @@ CLI 工具 — 量化交易系統的命令列介面。
 
 from __future__ import annotations
 
-import json
 import logging
-import sys
 from typing import Optional
 
 import typer
@@ -48,15 +46,23 @@ def backtest(
     rebalance: str = typer.Option("weekly", "--rebalance", "-r", help="再平衡頻率"),
     slippage: float = typer.Option(5.0, "--slippage", help="滑價 (bps)"),
     validate: bool = typer.Option(False, "--validate", "-v", help="是否執行回測驗證"),
+    report: Optional[str] = typer.Option(None, "--report", help="生成 HTML 報告（指定輸出路徑）"),
+    export_trades: Optional[str] = typer.Option(None, "--export-trades", help="匯出交易明細 CSV"),
+    benchmark: Optional[str] = typer.Option(None, "--benchmark", "-b", help="基準指數代碼（如 SPY, 0050.TW）"),
     log_level: str = typer.Option("INFO", "--log-level", "-l"),
 ):
     """執行回測。"""
     _setup_logging(log_level)
 
     from src.backtest.engine import BacktestConfig, BacktestEngine
+    from src.strategy.registry import resolve_strategy
 
     # 解析策略
-    strat = _resolve_strategy(strategy)
+    try:
+        strat = resolve_strategy(strategy)
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1)
 
     config = BacktestConfig(
         universe=universe,
@@ -84,6 +90,37 @@ def backtest(
         validation = validate_backtest(result)
         console.print(validation.summary())
 
+    # 匯出交易明細
+    if export_trades:
+        from src.backtest.report import export_trades_csv
+        export_trades_csv(result, export_trades)
+        console.print(f"[green]Trades exported to {export_trades}[/green]")
+
+    # 基準比較
+    bench_comparison = None
+    if benchmark:
+        from src.data.sources.yahoo import YahooFeed
+        from src.backtest.report import compare_with_benchmark
+        console.print(f"[bold]Fetching benchmark: {benchmark}...[/bold]")
+        yahoo = YahooFeed()
+        bench_bars = yahoo.get_bars(benchmark, start=start, end=end)
+        if not bench_bars.empty:
+            bench_nav = bench_bars["close"]
+            bench_comparison = compare_with_benchmark(result, bench_nav, benchmark)
+            rel = bench_comparison.get("relative", {})
+            console.print(f"  Excess Return: {rel.get('excess_return', 0):+.2%}")
+            console.print(f"  Info Ratio:    {rel.get('information_ratio', 0):.2f}")
+            console.print(f"  Alpha:         {rel.get('alpha', 0):+.2%}")
+            console.print(f"  Beta:          {rel.get('beta', 0):.2f}\n")
+        else:
+            console.print(f"[yellow]No benchmark data for {benchmark}[/yellow]")
+
+    # 生成 HTML 報告
+    if report:
+        from src.backtest.report import generate_html_report
+        generate_html_report(result, benchmark_comparison=bench_comparison, output_path=report)
+        console.print(f"[green]HTML report saved to {report}[/green]")
+
     return result
 
 
@@ -98,7 +135,7 @@ def server(
     _setup_logging(log_level)
     import uvicorn
     console.print(f"[bold]Starting API server at http://{host}:{port}[/bold]")
-    console.print("Docs: http://localhost:{port}/docs")
+    console.print(f"Docs: http://localhost:{port}/docs")
     uvicorn.run(
         "src.api.app:app",
         host=host,
@@ -179,24 +216,68 @@ def factors(
     console.print(f"\nData: {len(bars)} bars, last: {bars.index[-1]}")
 
 
-def _resolve_strategy(name: str):
-    """根據名稱解析策略。"""
-    from strategies.momentum import MomentumStrategy
-    from strategies.mean_reversion import MeanReversionStrategy
+@app.command(name="factor-analysis")
+def factor_analysis(
+    factor: str = typer.Option("momentum", "--factor", "-f", help="因子名稱"),
+    universe: list[str] = typer.Option(
+        ["AAPL", "MSFT", "GOOGL", "AMZN", "META"],
+        "--universe", "-u",
+        help="股票池",
+    ),
+    start: str = typer.Option("2022-01-01", "--start", help="開始日期"),
+    end: str = typer.Option("2024-12-31", "--end", help="結束日期"),
+    horizon: int = typer.Option(5, "--horizon", "-h", help="報酬週期（交易日）"),
+    decay: bool = typer.Option(False, "--decay", "-d", help="執行因子衰減分析"),
+    log_level: str = typer.Option("WARNING", "--log-level", "-l"),
+):
+    """因子研究分析。"""
+    _setup_logging(log_level)
 
-    mapping = {
-        "momentum": MomentumStrategy,
-        "momentum_12_1": MomentumStrategy,
-        "mean_reversion": MeanReversionStrategy,
-    }
+    from src.data.sources.yahoo import YahooFeed
+    from src.strategy.research import (
+        FACTOR_REGISTRY,
+        analyze_factor,
+        factor_decay as run_decay,
+    )
 
-    cls = mapping.get(name)
-    if cls is None:
-        console.print(f"[red]Unknown strategy: {name}[/red]")
-        console.print(f"Available: {', '.join(mapping.keys())}")
+    available = list(FACTOR_REGISTRY.keys())
+    if factor not in FACTOR_REGISTRY:
+        console.print(f"[red]Unknown factor: {factor}[/red]")
+        console.print(f"Available: {', '.join(available)}")
         raise typer.Exit(1)
 
-    return cls()
+    console.print(f"\n[bold]Factor Analysis: {factor}[/bold]")
+    console.print(f"Universe: {', '.join(universe)}")
+    console.print(f"Period: {start} ~ {end}, Horizon: {horizon}d\n")
+
+    # 下載數據
+    import pandas as pd
+    yahoo = YahooFeed()
+    warmup_start = (pd.Timestamp(start) - pd.tseries.offsets.BDay(400)).strftime("%Y-%m-%d")
+    data: dict = {}
+    for sym in universe:
+        bars = yahoo.get_bars(sym, start=warmup_start, end=end)
+        if not bars.empty:
+            data[sym] = bars
+            console.print(f"  Loaded {len(bars)} bars for {sym}")
+        else:
+            console.print(f"  [yellow]No data for {sym}[/yellow]")
+
+    if len(data) < 3:
+        console.print("[red]Need at least 3 symbols with data[/red]")
+        raise typer.Exit(1)
+
+    # IC 分析
+    ic_result = analyze_factor(data, factor, horizon=horizon)
+    console.print(f"\n{ic_result.summary()}")
+
+    # 衰減分析
+    if decay:
+        console.print()
+        decay_result = run_decay(data, factor)
+        console.print(decay_result.summary())
+
+    console.print()
 
 
 if __name__ == "__main__":

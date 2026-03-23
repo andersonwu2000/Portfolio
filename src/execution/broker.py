@@ -7,7 +7,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from decimal import Decimal
 
-from src.domain.models import Order, Portfolio
+from src.domain.models import Order
 
 
 class BrokerAdapter(ABC):

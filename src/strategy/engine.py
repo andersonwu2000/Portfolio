@@ -15,7 +15,6 @@ from src.domain.models import (
     Portfolio,
     Side,
 )
-from src.strategy.base import Strategy
 
 logger = logging.getLogger(__name__)
 

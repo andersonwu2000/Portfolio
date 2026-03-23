@@ -41,6 +41,9 @@ web-build:
 web-typecheck:
 	cd apps/web && bun run typecheck
 
+web-test:
+	cd apps/web && bun run test
+
 mobile-typecheck:
 	cd apps/mobile && bun run typecheck
 
