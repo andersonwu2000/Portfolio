@@ -29,7 +29,7 @@ export function CompareTable({ entries }: Props) {
 
   return (
     <div className="bg-surface rounded-xl p-5 overflow-x-auto">
-      <p className="text-sm font-medium text-slate-400 mb-3">{t.backtest.comparison}</p>
+      <p className="text-base font-semibold text-slate-400 mb-3">{t.backtest.comparison}</p>
       <table className="w-full text-sm">
         <thead>
           <tr className="text-slate-500 border-b border-surface-light">

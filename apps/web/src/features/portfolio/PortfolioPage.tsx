@@ -22,28 +22,28 @@ export function PortfolioPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold">{t.portfolio.title}</h2>
+      <h2 className="text-2xl font-bold">{t.portfolio.title}</h2>
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 text-sm">
         <div className="bg-slate-50 dark:bg-surface rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
           <p className="text-slate-500 dark:text-slate-400">{t.dashboard.nav}</p>
-          <p className="text-lg font-bold">{fmtCurrency(pf.nav)}</p>
+          <p className="text-xl font-bold">{fmtCurrency(pf.nav)}</p>
         </div>
         <div className="bg-slate-50 dark:bg-surface rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
           <p className="text-slate-500 dark:text-slate-400">{t.dashboard.cash}</p>
-          <p className="text-lg font-bold">{fmtCurrency(pf.cash)}</p>
+          <p className="text-xl font-bold">{fmtCurrency(pf.cash)}</p>
         </div>
         <div className="bg-slate-50 dark:bg-surface rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
           <p className="text-slate-500 dark:text-slate-400">{t.portfolio.grossExposure}</p>
-          <p className="text-lg font-bold">{fmtPct(pf.gross_exposure)}</p>
+          <p className="text-xl font-bold">{fmtPct(pf.gross_exposure)}</p>
         </div>
         <div className="bg-slate-50 dark:bg-surface rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
           <p className="text-slate-500 dark:text-slate-400">{t.portfolio.netExposure}</p>
-          <p className="text-lg font-bold">{fmtPct(pf.net_exposure)}</p>
+          <p className="text-xl font-bold">{fmtPct(pf.net_exposure)}</p>
         </div>
         <div className="bg-slate-50 dark:bg-surface rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
           <p className="text-slate-500 dark:text-slate-400">{t.dashboard.dailyPnl}</p>
-          <p className={`text-lg font-bold ${pnlColor(pf.daily_pnl)}`}>
+          <p className={`text-xl font-bold ${pnlColor(pf.daily_pnl)}`}>
             {fmtCurrency(pf.daily_pnl)} ({fmtPct(pf.daily_pnl_pct)})
           </p>
         </div>

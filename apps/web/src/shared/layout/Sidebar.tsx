@@ -44,10 +44,10 @@ export function Sidebar({ onLogout }: { onLogout?: () => void }) {
     <aside className={`${collapsed ? "w-16" : "w-56"} bg-slate-50 dark:bg-surface-dark border-r border-slate-200 dark:border-surface-light flex flex-col h-screen sticky top-0 transition-all duration-200`}>
       <div className={`px-5 py-6 border-b border-slate-200 dark:border-surface-light ${collapsed ? "px-3" : ""}`}>
         {collapsed ? (
-          <h1 className="text-lg font-bold text-center">Q</h1>
+          <h1 className="text-xl font-bold text-center">Q</h1>
         ) : (
           <>
-            <h1 className="text-lg font-bold tracking-tight">{t.appName}</h1>
+            <h1 className="text-xl font-bold tracking-tight">{t.appName}</h1>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t.appVersion}</p>
             <span className={`inline-block mt-1.5 px-2 py-0.5 rounded text-xs font-semibold ${ROLE_BADGE_COLORS[role]}`}>
               {t.common.roles[role]}

@@ -51,7 +51,7 @@ export function SettingsPage({ onSave }: { onSave?: () => void } = {}) {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold">{t.settings.title}</h2>
+      <h2 className="text-2xl font-bold">{t.settings.title}</h2>
 
       {!isAuthenticated() && (
         <div className="bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl p-4 text-sm">
@@ -65,7 +65,7 @@ export function SettingsPage({ onSave }: { onSave?: () => void } = {}) {
             <p className="text-sm font-medium text-slate-600 dark:text-slate-400">{t.admin.loginWithPassword}</p>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">{t.admin.usernameLabel}</label>
+                <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">{t.admin.usernameLabel}</label>
                 <input
                   type="text"
                   value={username}
@@ -75,7 +75,7 @@ export function SettingsPage({ onSave }: { onSave?: () => void } = {}) {
                 />
               </div>
               <div>
-                <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">{t.admin.passwordLabel}</label>
+                <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">{t.admin.passwordLabel}</label>
                 <input
                   type="password"
                   value={password}
@@ -170,7 +170,7 @@ export function SettingsPage({ onSave }: { onSave?: () => void } = {}) {
       )}
       {status && (
         <div>
-          <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-3">{t.settings.systemStatus}</p>
+          <p className="text-base font-semibold text-slate-600 dark:text-slate-400 mb-3">{t.settings.systemStatus}</p>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <MetricCard label={t.settings.mode} value={status.mode} />
             <MetricCard label={t.settings.uptime} value={fmtUptime(status.uptime_seconds)} />

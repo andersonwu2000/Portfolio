@@ -107,7 +107,7 @@ export function BacktestPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold">{t.backtest.title}</h2>
+      <h2 className="text-2xl font-bold">{t.backtest.title}</h2>
 
       <form
         onSubmit={handleSubmit}

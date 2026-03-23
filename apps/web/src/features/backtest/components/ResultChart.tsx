@@ -14,7 +14,7 @@ export function ResultChart({ data }: { data: NavPoint[] }) {
   const c = getChartColors(isDark);
   return (
     <div className="bg-slate-50 dark:bg-surface rounded-xl p-5 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
-      <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-3">{t.backtest.navCurve}</p>
+      <p className="text-base font-semibold text-slate-500 dark:text-slate-400 mb-3">{t.backtest.navCurve}</p>
       <ResponsiveContainer width="100%" height={320}>
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke={c.grid} />

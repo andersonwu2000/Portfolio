@@ -94,7 +94,7 @@ export function MonthlyHeatmap({ data }: { data: NavPoint[] }) {
 
   return (
     <div className="bg-slate-50 dark:bg-surface rounded-xl p-5 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
-      <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-3">{t.backtest.monthlyReturns}</p>
+      <p className="text-base font-semibold text-slate-500 dark:text-slate-400 mb-3">{t.backtest.monthlyReturns}</p>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>

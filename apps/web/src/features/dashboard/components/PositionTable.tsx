@@ -6,7 +6,7 @@ export function PositionTable({ positions }: { positions: Position[] }) {
   const { t } = useT();
   return (
     <div className="bg-slate-50 dark:bg-surface rounded-xl p-5 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
-      <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-3">{t.dashboard.topPositions}</p>
+      <p className="text-base font-semibold text-slate-500 dark:text-slate-400 mb-3">{t.dashboard.topPositions}</p>
       <table className="w-full text-sm">
         <thead>
           <tr className="text-slate-500 border-b border-slate-200 dark:border-surface-light">

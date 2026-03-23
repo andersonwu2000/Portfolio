@@ -71,7 +71,7 @@ export function RiskPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold">{t.risk.title}</h2>
+        <h2 className="text-2xl font-bold">{t.risk.title}</h2>
         {canManageRisk && (
           <button onClick={handleKill}
             disabled={killLoading}
@@ -87,7 +87,7 @@ export function RiskPage() {
       {rulesError && <ErrorAlert message={rulesError} onRetry={refreshRules} />}
       {!rulesError && (
         <div className="bg-slate-50 dark:bg-surface rounded-xl p-5 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
-          <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-3">{t.risk.riskRules}</p>
+          <p className="text-base font-semibold text-slate-500 dark:text-slate-400 mb-3">{t.risk.riskRules}</p>
           <div className="space-y-2">
             {rules?.map((r) => {
               const descKey = getRuleDescKey(r.name);
@@ -131,7 +131,7 @@ export function RiskPage() {
       {alertsError && <ErrorAlert message={alertsError} onRetry={refreshAlerts} />}
       {!alertsError && (
         <div className="bg-slate-50 dark:bg-surface rounded-xl p-5 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none" role="alert" aria-live="polite">
-          <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-3">{t.risk.recentAlerts}</p>
+          <p className="text-base font-semibold text-slate-500 dark:text-slate-400 mb-3">{t.risk.recentAlerts}</p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -155,8 +155,8 @@ export function RiskPage() {
                     <td className="py-2"><StatusBadge status={a.severity} /></td>
                     <td className="text-right py-2">{fmtNum(a.metric_value, 4)}</td>
                     <td className="text-right py-2">{fmtNum(a.threshold, 4)}</td>
-                    <td className="py-2 text-xs">{a.action_taken}</td>
-                    <td className="py-2 text-xs text-slate-400 max-w-xs truncate">{a.message}</td>
+                    <td className="py-2 text-sm">{a.action_taken}</td>
+                    <td className="py-2 text-sm text-slate-400 max-w-xs truncate">{a.message}</td>
                   </tr>
                 ))}
               </tbody>

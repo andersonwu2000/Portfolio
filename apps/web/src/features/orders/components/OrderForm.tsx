@@ -45,10 +45,10 @@ export function OrderForm({ onSubmitted }: Props) {
 
   return (
     <form onSubmit={handleSubmit} aria-label="New order form" className="bg-slate-50 dark:bg-surface rounded-xl p-5 space-y-4 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
-      <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{t.orders.newOrder}</p>
+      <p className="text-base font-semibold text-slate-500 dark:text-slate-400">{t.orders.newOrder}</p>
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <label className="space-y-1">
-          <span className="text-xs text-slate-400">{t.orders.symbol}</span>
+          <span className="text-sm text-slate-400">{t.orders.symbol}</span>
           <input
             value={symbol}
             onChange={(e) => setSymbol(e.target.value.toUpperCase())}
@@ -58,7 +58,7 @@ export function OrderForm({ onSubmitted }: Props) {
           />
         </label>
         <div className="space-y-1">
-          <span className="text-xs text-slate-500 dark:text-slate-400">{t.orders.side}</span>
+          <span className="text-sm text-slate-500 dark:text-slate-400">{t.orders.side}</span>
           <div className="flex gap-1">
             <button
               type="button"
@@ -87,7 +87,7 @@ export function OrderForm({ onSubmitted }: Props) {
           </div>
         </div>
         <label className="space-y-1">
-          <span className="text-xs text-slate-500 dark:text-slate-400">{t.orders.qty}</span>
+          <span className="text-sm text-slate-500 dark:text-slate-400">{t.orders.qty}</span>
           <input
             type="number"
             value={quantity}
@@ -98,7 +98,7 @@ export function OrderForm({ onSubmitted }: Props) {
           />
         </label>
         <label className="space-y-1">
-          <span className="text-xs text-slate-500 dark:text-slate-400">
+          <span className="text-sm text-slate-500 dark:text-slate-400">
             {t.orders.price} ({t.orders.mktIfEmpty})
           </span>
           <input

@@ -39,7 +39,7 @@ export function CompareChart({ entries }: Props) {
 
   return (
     <div className="bg-slate-50 dark:bg-surface rounded-xl p-5 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
-      <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-3">{t.backtest.navComparison}</p>
+      <p className="text-base font-semibold text-slate-500 dark:text-slate-400 mb-3">{t.backtest.navComparison}</p>
       <ResponsiveContainer width="100%" height={320}>
         <LineChart data={data}>
           <XAxis dataKey="date" tick={{ fontSize: 11, fill: c.tick }} tickFormatter={(v) => v.slice(5)} />

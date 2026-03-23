@@ -25,7 +25,7 @@ export function SystemMetrics() {
   if (loading && !metrics) {
     return (
       <div>
-        <p className="text-sm font-medium text-slate-400 mb-3">{t.settings.metrics}</p>
+        <p className="text-base font-semibold text-slate-400 mb-3">{t.settings.metrics}</p>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCardSkeleton /><MetricCardSkeleton /><MetricCardSkeleton /><MetricCardSkeleton />
         </div>
@@ -37,7 +37,7 @@ export function SystemMetrics() {
 
   return (
     <div>
-      <p className="text-sm font-medium text-slate-400 mb-3">{t.settings.metrics}</p>
+      <p className="text-base font-semibold text-slate-400 mb-3">{t.settings.metrics}</p>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard label={t.settings.uptime} value={fmtUptime(metrics.uptime_seconds)} />
         <MetricCard label={t.settings.requestCount} value={String(metrics.total_requests)} />

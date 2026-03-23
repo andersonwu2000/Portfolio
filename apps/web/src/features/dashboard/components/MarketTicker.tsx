@@ -73,7 +73,7 @@ export function MarketTicker() {
 
   return (
     <div className="bg-slate-50 dark:bg-surface rounded-xl px-4 py-3 overflow-hidden border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
-      <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">{t.dashboard.marketTicker}</p>
+      <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">{t.dashboard.marketTicker}</p>
       <div className="flex gap-6 overflow-x-auto scrollbar-hide">
         {list.map((item) => {
           const flash = state.flashes[item.symbol];

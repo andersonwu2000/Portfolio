@@ -149,7 +149,7 @@ export function AdminPage() {
           <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${ROLE_BADGE_COLORS[row.role]}`}>
             {t.common.roles[row.role]}
           </span>
-          <span className="text-xs text-slate-400 dark:text-slate-500">
+          <span className="text-sm text-slate-400 dark:text-slate-500">
             {roleDescriptions[row.role]}
           </span>
         </div>
@@ -175,7 +175,7 @@ export function AdminPage() {
     {
       key: "created_at",
       label: t.admin.createdAt,
-      render: (row) => <span className="text-slate-500 dark:text-slate-400 text-xs">{fmtDate(row.created_at)}</span>,
+      render: (row) => <span className="text-slate-500 dark:text-slate-400 text-sm">{fmtDate(row.created_at)}</span>,
       sortValue: (row) => row.created_at,
     },
     {
@@ -213,7 +213,7 @@ export function AdminPage() {
   if (error) {
     return (
       <div className="space-y-6">
-        <h2 className="text-xl font-bold">{t.admin.title}</h2>
+        <h2 className="text-2xl font-bold">{t.admin.title}</h2>
         <div className="bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-xl p-4 text-sm">
           {error}
         </div>
@@ -224,7 +224,7 @@ export function AdminPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold">{t.admin.title}</h2>
+        <h2 className="text-2xl font-bold">{t.admin.title}</h2>
         <button
           onClick={() => {
             setCreateForm({ username: "", display_name: "", password: "", role: "viewer" });

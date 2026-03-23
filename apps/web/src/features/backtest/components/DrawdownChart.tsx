@@ -27,7 +27,7 @@ export function DrawdownChart({ data }: { data: NavPoint[] }) {
 
   return (
     <div className="bg-slate-50 dark:bg-surface rounded-xl p-5 border border-slate-200 dark:border-transparent shadow-sm dark:shadow-none">
-      <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-3">{t.backtest.drawdown}</p>
+      <p className="text-base font-semibold text-slate-500 dark:text-slate-400 mb-3">{t.backtest.drawdown}</p>
       <ResponsiveContainer width="100%" height={320}>
         <AreaChart data={ddData}>
           <CartesianGrid strokeDasharray="3 3" stroke={c.grid} />

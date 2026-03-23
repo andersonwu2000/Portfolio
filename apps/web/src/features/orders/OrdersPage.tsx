@@ -50,7 +50,7 @@ export function OrdersPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold">{t.orders.title}</h2>
+        <h2 className="text-2xl font-bold">{t.orders.title}</h2>
         {canTrade && (
           <button
             onClick={() => setShowForm(!showForm)}
@@ -128,7 +128,7 @@ export function OrdersPage() {
                     {o.filled_avg_price != null ? `$${o.filled_avg_price.toFixed(2)}` : "\u2014"}
                   </td>
                   <td className="text-right py-2">{fmtCurrency(o.commission)}</td>
-                  <td className="py-2 text-xs text-slate-400">{o.strategy_id}</td>
+                  <td className="py-2 text-sm text-slate-400">{o.strategy_id}</td>
                   <td className="py-2"><StatusBadge status={o.status} /></td>
                 </tr>
               ))}
