@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useAuth } from "../src/hooks/useAuth";
 import { useT } from "@/src/i18n";
+import { bg, textPrimary, textMuted, textSecondary, surface, surfaceLight, textPlaceholder, warning, danger, blue, white } from "@/src/theme/colors";
 
 export default function LoginScreen() {
   const { t } = useT();
@@ -39,7 +40,7 @@ export default function LoginScreen() {
           value={serverUrl}
           onChangeText={setServerUrl}
           placeholder="https://your-server:8000"
-          placeholderTextColor="#475569"
+          placeholderTextColor={textPlaceholder}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="url"
@@ -54,7 +55,7 @@ export default function LoginScreen() {
           value={apiKey}
           onChangeText={setApiKey}
           placeholder={t.login.apiKeyPlaceholder}
-          placeholderTextColor="#475569"
+          placeholderTextColor={textPlaceholder}
           autoCapitalize="none"
           autoCorrect={false}
           secureTextEntry
@@ -68,7 +69,7 @@ export default function LoginScreen() {
           disabled={loading || !serverUrl || !apiKey}
         >
           {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={white} />
           ) : (
             <Text style={styles.btnText}>{t.login.connect}</Text>
           )}
@@ -81,54 +82,54 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0F172A",
+    backgroundColor: bg,
     justifyContent: "center",
   },
   inner: {
     paddingHorizontal: 32,
   },
   title: {
-    color: "#F1F5F9",
+    color: textPrimary,
     fontSize: 32,
     fontWeight: "800",
     textAlign: "center",
     marginBottom: 4,
   },
   subtitle: {
-    color: "#64748B",
+    color: textMuted,
     fontSize: 14,
     textAlign: "center",
     marginBottom: 40,
   },
   label: {
-    color: "#94A3B8",
+    color: textSecondary,
     fontSize: 13,
     fontWeight: "600",
     marginBottom: 6,
     marginTop: 16,
   },
   input: {
-    backgroundColor: "#1E293B",
+    backgroundColor: surface,
     borderRadius: 10,
     padding: 14,
-    color: "#F1F5F9",
+    color: textPrimary,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: "#334155",
+    borderColor: surfaceLight,
   },
   warning: {
-    color: "#F59E0B",
+    color: warning,
     fontSize: 12,
     marginTop: 6,
   },
   error: {
-    color: "#EF4444",
+    color: danger,
     fontSize: 13,
     marginTop: 12,
     textAlign: "center",
   },
   button: {
-    backgroundColor: "#3B82F6",
+    backgroundColor: blue,
     borderRadius: 10,
     padding: 16,
     alignItems: "center",
@@ -138,7 +139,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   btnText: {
-    color: "#FFFFFF",
+    color: white,
     fontSize: 16,
     fontWeight: "700",
   },

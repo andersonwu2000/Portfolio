@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Animated, StyleSheet, View } from "react-native";
+import { surfaceLight, surface } from "@/src/theme/colors";
 
 export function Skeleton({ width = "100%" as const, height = 16 }: { width?: number | `${number}%`; height?: number }) {
   const opacity = useRef(new Animated.Value(0.3)).current;
@@ -27,6 +28,6 @@ export function MetricCardSkeleton() {
 }
 
 const styles = StyleSheet.create({
-  skeleton: { backgroundColor: "#334155", borderRadius: 4 },
-  card: { backgroundColor: "#1E293B", borderRadius: 12, padding: 14, gap: 6, width: "48%" },
+  skeleton: { backgroundColor: surfaceLight, borderRadius: 4 },
+  card: { backgroundColor: surface, borderRadius: 12, padding: 14, gap: 6, width: "48%" },
 });

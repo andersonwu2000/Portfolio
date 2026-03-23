@@ -4,6 +4,7 @@ import { useAlerts } from "../../src/hooks/useAlerts";
 import { AlertItem } from "../../src/components/AlertItem";
 import { risk } from "@quant/shared";
 import { useT } from "@/src/i18n";
+import { bg, dangerDark, white, dangerLight, textMuted, blue } from "@/src/theme/colors";
 
 export default function AlertsScreen() {
   const { t } = useT();
@@ -38,7 +39,7 @@ export default function AlertsScreen() {
         keyExtractor={(item, i) => `${item.timestamp}-${i}`}
         renderItem={({ item }) => <AlertItem alert={item} />}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#3B82F6" />
+          <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={blue} />
         }
         ListEmptyComponent={<Text style={styles.empty}>{t.risk.noAlerts}</Text>}
         ListFooterComponent={
@@ -58,15 +59,15 @@ export default function AlertsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0F172A" },
+  container: { flex: 1, backgroundColor: bg },
   killButton: {
-    backgroundColor: "#DC2626",
+    backgroundColor: dangerDark,
     borderRadius: 10,
     padding: 14,
     alignItems: "center",
     marginTop: 24,
   },
-  killText: { color: "#FFFFFF", fontSize: 16, fontWeight: "800", letterSpacing: 1 },
-  killHint: { color: "#FCA5A5", fontSize: 11, marginTop: 4 },
-  empty: { color: "#64748B", fontSize: 14, textAlign: "center", padding: 24 },
+  killText: { color: white, fontSize: 16, fontWeight: "800", letterSpacing: 1 },
+  killHint: { color: dangerLight, fontSize: 11, marginTop: 4 },
+  empty: { color: textMuted, fontSize: 14, textAlign: "center", padding: 24 },
 });

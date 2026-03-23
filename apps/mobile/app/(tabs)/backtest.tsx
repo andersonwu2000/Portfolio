@@ -6,6 +6,7 @@ import { strategies as strategiesApi } from "@quant/shared";
 import type { BacktestRequest, StrategyInfo } from "@quant/shared";
 import { MetricCard } from "@/src/components/MetricCard";
 import { fmtPct, fmtNum } from "@/src/utils/format";
+import { bg, surface, textSecondary, textPrimary, textMuted, blueAlpha, blueLight, blueDark, white, danger } from "@/src/theme/colors";
 
 export default function BacktestScreen() {
   const { t } = useT();
@@ -51,19 +52,19 @@ export default function BacktestScreen() {
         value={form.universe.join(", ")}
         onChangeText={(v) => set("universe", v.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean))}
         placeholder="AAPL, MSFT, GOOGL"
-        placeholderTextColor="#64748B"
+        placeholderTextColor={textMuted}
       />
 
       <View style={styles.row}>
         <View style={styles.half}>
           <Text style={styles.sectionTitle}>{t.backtest.start}</Text>
           <TextInput style={styles.input} value={form.start}
-            onChangeText={(v) => set("start", v)} placeholder="2023-01-01" placeholderTextColor="#64748B" />
+            onChangeText={(v) => set("start", v)} placeholder="2023-01-01" placeholderTextColor={textMuted} />
         </View>
         <View style={styles.half}>
           <Text style={styles.sectionTitle}>{t.backtest.end}</Text>
           <TextInput style={styles.input} value={form.end}
-            onChangeText={(v) => set("end", v)} placeholder="2024-01-01" placeholderTextColor="#64748B" />
+            onChangeText={(v) => set("end", v)} placeholder="2024-01-01" placeholderTextColor={textMuted} />
         </View>
       </View>
 
@@ -74,7 +75,7 @@ export default function BacktestScreen() {
       >
         {running ? (
           <View style={styles.runningRow}>
-            <ActivityIndicator size="small" color="#FFF" />
+            <ActivityIndicator size="small" color={white} />
             <Text style={styles.submitText}>
               {progress ? `${progress.current}/${progress.total}` : t.backtest.running}
             </Text>
@@ -104,23 +105,23 @@ export default function BacktestScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0F172A" },
+  container: { flex: 1, backgroundColor: bg },
   content: { padding: 16 },
-  sectionTitle: { color: "#94A3B8", fontSize: 12, fontWeight: "500", marginBottom: 6, marginTop: 12 },
-  input: { backgroundColor: "#1E293B", borderRadius: 8, padding: 12, color: "#F1F5F9", fontSize: 14 },
+  sectionTitle: { color: textSecondary, fontSize: 12, fontWeight: "500", marginBottom: 6, marginTop: 12 },
+  input: { backgroundColor: surface, borderRadius: 8, padding: 12, color: textPrimary, fontSize: 14 },
   chipRow: { flexDirection: "row", marginBottom: 4 },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: "#1E293B", marginRight: 8 },
-  chipActive: { backgroundColor: "rgba(59, 130, 246, 0.2)" },
-  chipText: { color: "#94A3B8", fontSize: 13, fontWeight: "500" },
-  chipTextActive: { color: "#60A5FA" },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: surface, marginRight: 8 },
+  chipActive: { backgroundColor: blueAlpha },
+  chipText: { color: textSecondary, fontSize: 13, fontWeight: "500" },
+  chipTextActive: { color: blueLight },
   row: { flexDirection: "row", gap: 12 },
   half: { flex: 1 },
-  submitBtn: { backgroundColor: "#2563EB", borderRadius: 10, padding: 14, alignItems: "center", marginTop: 20 },
+  submitBtn: { backgroundColor: blueDark, borderRadius: 10, padding: 14, alignItems: "center", marginTop: 20 },
   submitDisabled: { opacity: 0.6 },
-  submitText: { color: "#FFF", fontWeight: "600", fontSize: 15 },
+  submitText: { color: white, fontWeight: "600", fontSize: 15 },
   runningRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  error: { color: "#EF4444", marginTop: 12, fontSize: 13 },
+  error: { color: danger, marginTop: 12, fontSize: 13 },
   results: { marginTop: 20 },
-  resultsTitle: { color: "#F1F5F9", fontSize: 16, fontWeight: "700", marginBottom: 12 },
+  resultsTitle: { color: textPrimary, fontSize: 16, fontWeight: "700", marginBottom: 12 },
   metricsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
 });

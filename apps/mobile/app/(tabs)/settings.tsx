@@ -6,6 +6,7 @@ import { system, risk } from "@quant/shared";
 import { useAuth } from "../../src/hooks/useAuth";
 import { useT } from "@/src/i18n";
 import type { Lang } from "@/src/i18n";
+import { bg, surface, surfaceLight, textPrimary, textSecondary, success, white, danger, blueAlpha, blueLight, blue } from "@/src/theme/colors";
 
 export default function SettingsScreen() {
   const { t, lang, setLang } = useT();
@@ -90,7 +91,7 @@ export default function SettingsScreen() {
             <View
               style={[
                 styles.toggle,
-                { backgroundColor: rule.enabled ? "#22C55E" : "#475569" },
+                { backgroundColor: rule.enabled ? success : surfaceLight },
               ]}
             >
               <Text style={styles.toggleText}>{rule.enabled ? "ON" : "OFF"}</Text>
@@ -120,19 +121,19 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0F172A" },
-  sectionTitle: { color: "#F1F5F9", fontSize: 18, fontWeight: "700", marginBottom: 12, marginTop: 8 },
-  card: { backgroundColor: "#1E293B", borderRadius: 12, padding: 4, marginBottom: 20 },
+  container: { flex: 1, backgroundColor: bg },
+  sectionTitle: { color: textPrimary, fontSize: 18, fontWeight: "700", marginBottom: 12, marginTop: 8 },
+  card: { backgroundColor: surface, borderRadius: 12, padding: 4, marginBottom: 20 },
   infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#334155",
+    borderBottomColor: surfaceLight,
   },
-  infoLabel: { color: "#94A3B8", fontSize: 14 },
-  infoValue: { color: "#F1F5F9", fontSize: 14, fontWeight: "600" },
+  infoLabel: { color: textSecondary, fontSize: 14 },
+  infoValue: { color: textPrimary, fontSize: 14, fontWeight: "600" },
   ruleRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -140,19 +141,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#334155",
+    borderBottomColor: surfaceLight,
   },
-  ruleName: { color: "#F1F5F9", fontSize: 13, flex: 1 },
+  ruleName: { color: textPrimary, fontSize: 13, flex: 1 },
   toggle: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4 },
-  toggleText: { color: "#FFFFFF", fontSize: 11, fontWeight: "700" },
+  toggleText: { color: white, fontSize: 11, fontWeight: "700" },
   logoutBtn: {
-    backgroundColor: "#334155",
+    backgroundColor: surfaceLight,
     borderRadius: 10,
     padding: 14,
     alignItems: "center",
     marginTop: 8,
   },
-  logoutText: { color: "#EF4444", fontSize: 15, fontWeight: "600" },
+  logoutText: { color: danger, fontSize: 15, fontWeight: "600" },
   langRow: {
     flexDirection: "row",
     padding: 10,
@@ -162,18 +163,18 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: "#0F172A",
+    backgroundColor: bg,
     alignItems: "center",
   },
   langBtnActive: {
-    backgroundColor: "rgba(59, 130, 246, 0.2)",
+    backgroundColor: blueAlpha,
   },
   langBtnText: {
-    color: "#94A3B8",
+    color: textSecondary,
     fontSize: 14,
     fontWeight: "600",
   },
   langBtnTextActive: {
-    color: "#60A5FA",
+    color: blueLight,
   },
 });

@@ -50,6 +50,7 @@ export function OrdersPage() {
         <h2 className="text-xl font-bold">{t.orders.title}</h2>
         <button
           onClick={() => setShowForm(!showForm)}
+          aria-label={showForm ? t.common.cancel : t.orders.newOrder}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition-colors"
         >
           {showForm ? t.common.cancel : t.orders.newOrder}
@@ -65,10 +66,13 @@ export function OrdersPage() {
         />
       )}
 
-      <div className="flex gap-2">
+      <div className="flex gap-2" role="tablist">
         {filterKeys.map((f) => (
           <button
             key={f}
+            role="tab"
+            aria-selected={filter === f}
+            aria-current={filter === f ? "true" : undefined}
             onClick={() => setFilter(f)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               filter === f
@@ -88,7 +92,7 @@ export function OrdersPage() {
         <div className="bg-surface rounded-xl p-5 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-slate-500 border-b border-surface-light">
+              <tr className="text-slate-400 border-b border-surface-light">
                 <th className="text-left py-2">{t.orders.time}</th>
                 <th className="text-left py-2">{t.orders.symbol}</th>
                 <th className="text-left py-2">{t.orders.side}</th>

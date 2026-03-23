@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet } from "react-native";
+import { surface, textSecondary, textPrimary } from "@/src/theme/colors";
 
 interface Props {
   label: string;
@@ -20,7 +21,7 @@ export function MetricCard({ label, value, color, small }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#1E293B",
+    backgroundColor: surface,
     borderRadius: 12,
     padding: 16,
     flex: 1,
@@ -30,13 +31,13 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   label: {
-    color: "#94A3B8",
+    color: textSecondary,
     fontSize: 12,
     fontWeight: "500",
     marginBottom: 4,
   },
   value: {
-    color: "#F1F5F9",
+    color: textPrimary,
     fontSize: 20,
     fontWeight: "700",
   },

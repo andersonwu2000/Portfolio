@@ -1,6 +1,7 @@
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import type { StrategyInfo } from "@quant/shared";
 import { fmtCurrency, pnlColor } from "../utils/format";
+import { surface, textPrimary, success, textMuted, textSecondary, danger, white } from "@/src/theme/colors";
 
 interface Props {
   strategy: StrategyInfo;
@@ -16,7 +17,7 @@ export function StrategyRow({ strategy, onToggle }: Props) {
         <Text style={styles.name}>{strategy.name}</Text>
         <View style={styles.statusRow}>
           <View
-            style={[styles.dot, { backgroundColor: isRunning ? "#22C55E" : "#64748B" }]}
+            style={[styles.dot, { backgroundColor: isRunning ? success : textMuted }]}
           />
           <Text style={styles.statusText}>{strategy.status}</Text>
         </View>
@@ -41,20 +42,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#1E293B",
+    backgroundColor: surface,
     borderRadius: 10,
     padding: 14,
     marginBottom: 8,
   },
   left: { flex: 1 },
   right: { alignItems: "flex-end" },
-  name: { color: "#F1F5F9", fontSize: 16, fontWeight: "700" },
+  name: { color: textPrimary, fontSize: 16, fontWeight: "700" },
   statusRow: { flexDirection: "row", alignItems: "center", marginTop: 4 },
   dot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
-  statusText: { color: "#94A3B8", fontSize: 12 },
+  statusText: { color: textSecondary, fontSize: 12 },
   pnl: { fontSize: 14, fontWeight: "600", marginBottom: 8 },
   button: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 6 },
-  startBtn: { backgroundColor: "#22C55E" },
-  stopBtn: { backgroundColor: "#EF4444" },
-  btnText: { color: "#FFFFFF", fontSize: 13, fontWeight: "600" },
+  startBtn: { backgroundColor: success },
+  stopBtn: { backgroundColor: danger },
+  btnText: { color: white, fontSize: 13, fontWeight: "600" },
 });

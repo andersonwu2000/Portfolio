@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet } from "react-native";
 import type { Position } from "@quant/shared";
 import { fmtCurrency, fmtPct, pnlColor } from "../utils/format";
+import { surface, textPrimary, textMuted } from "@/src/theme/colors";
 
 interface Props {
   position: Position;
@@ -38,7 +39,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#1E293B",
+    backgroundColor: surface,
     borderRadius: 10,
     padding: 14,
     marginBottom: 8,
@@ -50,12 +51,12 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   symbol: {
-    color: "#F1F5F9",
+    color: textPrimary,
     fontSize: 16,
     fontWeight: "700",
   },
   detail: {
-    color: "#64748B",
+    color: textMuted,
     fontSize: 12,
     marginTop: 2,
   },

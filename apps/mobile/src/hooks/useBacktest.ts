@@ -24,12 +24,15 @@ export function useBacktest() {
       const MAX_POLL_MS = 10 * 60 * 1000; // 10 min on mobile
       const pollStart = Date.now();
       let status = summary.status;
+      let attempt = 0;
       while (status === "running" && mountedRef.current) {
         if (Date.now() - pollStart > MAX_POLL_MS) {
           setError("Backtest timed out");
           return;
         }
-        await new Promise((r) => setTimeout(r, 3000));
+        const delay = Math.min(3000 * 2 ** attempt, 30000);
+        attempt++;
+        await new Promise((r) => setTimeout(r, delay));
         if (!mountedRef.current) break;
         const s = await backtest.status(summary.task_id);
         status = s.status;

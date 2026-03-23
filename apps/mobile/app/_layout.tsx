@@ -7,6 +7,7 @@ import * as SecureStore from "expo-secure-store";
 import { AuthProvider, useAuth } from "../src/hooks/useAuth";
 import { ErrorBoundary } from "../src/components/ErrorBoundary";
 import { I18nContext, translations, type Lang } from "../src/i18n";
+import { bg, blue, textPrimary } from "../src/theme/colors";
 
 function RootNavigator() {
   const { authenticated, loading } = useAuth();
@@ -28,9 +29,9 @@ function RootNavigator() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: "#0F172A", justifyContent: "center", alignItems: "center" }}>
+      <View style={{ flex: 1, backgroundColor: bg, justifyContent: "center", alignItems: "center" }}>
         <StatusBar style="light" />
-        <ActivityIndicator size="large" color="#3B82F6" />
+        <ActivityIndicator size="large" color={blue} />
       </View>
     );
   }
@@ -40,9 +41,9 @@ function RootNavigator() {
       <StatusBar style="light" />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: "#0F172A" },
-          headerTintColor: "#F1F5F9",
-          contentStyle: { backgroundColor: "#0F172A" },
+          headerStyle: { backgroundColor: bg },
+          headerTintColor: textPrimary,
+          contentStyle: { backgroundColor: bg },
         }}
       >
         <Stack.Screen name="login" options={{ headerShown: false }} />

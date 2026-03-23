@@ -1,6 +1,7 @@
 import { Component } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import type { ReactNode, ErrorInfo } from "react";
+import { bg, warning, textPrimary, textSecondary, blueDark, white } from "@/src/theme/colors";
 
 interface Props { children: ReactNode; }
 interface State { hasError: boolean; error: Error | null; }
@@ -32,10 +33,10 @@ export class ErrorBoundary extends Component<Props, State> {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0F172A", justifyContent: "center", alignItems: "center", padding: 24 },
-  icon: { fontSize: 48, color: "#F59E0B", fontWeight: "800", marginBottom: 16 },
-  title: { color: "#F1F5F9", fontSize: 20, fontWeight: "700", marginBottom: 8 },
-  message: { color: "#94A3B8", fontSize: 14, textAlign: "center", marginBottom: 24 },
-  button: { backgroundColor: "#2563EB", borderRadius: 10, paddingHorizontal: 24, paddingVertical: 12 },
-  buttonText: { color: "#FFF", fontWeight: "600", fontSize: 15 },
+  container: { flex: 1, backgroundColor: bg, justifyContent: "center", alignItems: "center", padding: 24 },
+  icon: { fontSize: 48, color: warning, fontWeight: "800", marginBottom: 16 },
+  title: { color: textPrimary, fontSize: 20, fontWeight: "700", marginBottom: 8 },
+  message: { color: textSecondary, fontSize: 14, textAlign: "center", marginBottom: 24 },
+  button: { backgroundColor: blueDark, borderRadius: 10, paddingHorizontal: 24, paddingVertical: 12 },
+  buttonText: { color: white, fontWeight: "600", fontSize: 15 },
 });

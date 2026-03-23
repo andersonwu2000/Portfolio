@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { lazy, Suspense, useState, useCallback, useMemo } from "react";
 import { Sidebar } from "@shared/layout";
-import { ErrorBoundary } from "@shared/ui";
+import { ErrorBoundary, ToastProvider } from "@shared/ui";
 import { isAuthenticated, logout } from "@core/api";
 import { I18nContext, getSavedLang, saveLang, translations, type Lang } from "@core/i18n";
 
@@ -39,6 +39,7 @@ export default function App() {
 
   return (
     <ErrorBoundary>
+      <ToastProvider>
       <I18nContext.Provider value={i18nValue}>
         <div className="flex min-h-screen bg-surface-dark text-slate-100">
           <Sidebar onLogout={isAuthenticated() ? handleLogout : undefined} />
@@ -58,6 +59,7 @@ export default function App() {
           </main>
         </div>
       </I18nContext.Provider>
+      </ToastProvider>
     </ErrorBoundary>
   );
 }

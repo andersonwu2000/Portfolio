@@ -24,7 +24,7 @@ export function DashboardPage() {
     <div className="space-y-6">
       <h2 className="text-xl font-bold">{t.dashboard.title}</h2>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" aria-live="polite">
         <MetricCard label={t.dashboard.nav} value={fmtCurrency(pf.nav)} />
         <MetricCard label={t.dashboard.cash} value={fmtCurrency(pf.cash)} />
         <MetricCard

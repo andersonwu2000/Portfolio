@@ -6,6 +6,7 @@ import { portfolio } from "@quant/shared";
 import { PositionRow } from "../../src/components/PositionRow";
 import { fmtCurrency } from "../../src/utils/format";
 import { useT } from "@/src/i18n";
+import { bg, surface, textSecondary, textPrimary, blue, success, danger, textMuted } from "@/src/theme/colors";
 
 export default function PositionsScreen() {
   const { t } = useT();
@@ -45,7 +46,7 @@ export default function PositionsScreen() {
         keyExtractor={(item) => item.symbol}
         renderItem={({ item }) => <PositionRow position={item} />}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#3B82F6" />
+          <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={blue} />
         }
         ListHeaderComponent={
           <>
@@ -57,7 +58,7 @@ export default function PositionsScreen() {
               </View>
               <View style={styles.summaryItem}>
                 <Text style={styles.summaryLabel}>{t.portfolio.unrealizedPnl}</Text>
-                <Text style={[styles.summaryValue, { color: totalPnl >= 0 ? "#22C55E" : "#EF4444" }]}>
+                <Text style={[styles.summaryValue, { color: totalPnl >= 0 ? success : danger }]}>
                   {fmtCurrency(totalPnl)}
                 </Text>
               </View>
@@ -72,18 +73,18 @@ export default function PositionsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0F172A" },
+  container: { flex: 1, backgroundColor: bg },
   summary: {
     flexDirection: "row",
     justifyContent: "space-around",
-    backgroundColor: "#1E293B",
+    backgroundColor: surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 20,
   },
   summaryItem: { alignItems: "center" },
-  summaryLabel: { color: "#94A3B8", fontSize: 12 },
-  summaryValue: { color: "#F1F5F9", fontSize: 20, fontWeight: "700", marginTop: 4 },
-  error: { color: "#EF4444", fontSize: 14, textAlign: "center", padding: 12, marginBottom: 8 },
-  empty: { color: "#64748B", fontSize: 14, textAlign: "center", padding: 24 },
+  summaryLabel: { color: textSecondary, fontSize: 12 },
+  summaryValue: { color: textPrimary, fontSize: 20, fontWeight: "700", marginTop: 4 },
+  error: { color: danger, fontSize: 14, textAlign: "center", padding: 12, marginBottom: 8 },
+  empty: { color: textMuted, fontSize: 14, textAlign: "center", padding: 24 },
 });

@@ -165,6 +165,15 @@ export const en = {
     },
   },
 
+  // toast
+  toast: {
+    orderSubmitted: "Order submitted successfully",
+    orderFailed: "Failed to submit order",
+    killSwitchActivated: "Kill switch activated",
+    ruleSaved: "Rule updated",
+    settingsSaved: "Settings saved",
+  },
+
   // settings
   settings: {
     title: "Settings",

@@ -70,12 +70,20 @@ export function DataTable<T>({
 
   return (
     <div className="bg-surface rounded-xl p-5 overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className="w-full text-sm" role="table">
         <thead>
-          <tr className="text-slate-500 border-b border-surface-light">
+          <tr className="text-slate-400 border-b border-surface-light">
             {columns.map((col) => (
               <th
                 key={col.key}
+                role="columnheader"
+                aria-sort={
+                  col.sortValue
+                    ? sortKey === col.key
+                      ? sortDir === "asc" ? "ascending" : "descending"
+                      : "none"
+                    : undefined
+                }
                 className={`py-2 ${
                   col.align === "right" ? "text-right" : "text-left"
                 } ${
@@ -123,6 +131,7 @@ export function DataTable<T>({
             <button
               onClick={() => setPage(Math.max(0, clamped - 1))}
               disabled={clamped === 0}
+              aria-label="Previous page"
               className="px-2 py-1 rounded hover:bg-surface-light disabled:opacity-30 transition-colors"
             >
               &lt;
@@ -133,6 +142,7 @@ export function DataTable<T>({
             <button
               onClick={() => setPage(Math.min(totalPages - 1, clamped + 1))}
               disabled={clamped >= totalPages - 1}
+              aria-label="Next page"
               className="px-2 py-1 rounded hover:bg-surface-light disabled:opacity-30 transition-colors"
             >
               &gt;

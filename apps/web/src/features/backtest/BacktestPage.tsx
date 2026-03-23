@@ -105,6 +105,7 @@ export function BacktestPage() {
 
       <form
         onSubmit={handleSubmit}
+        aria-busy={running}
         className="bg-surface rounded-xl p-5 grid grid-cols-2 lg:grid-cols-4 gap-4"
       >
         <div className="space-y-1">
@@ -165,7 +166,7 @@ export function BacktestPage() {
         </div>
       </form>
 
-      {error && <div className="bg-red-500/10 text-red-400 rounded-xl p-4 text-sm">{error}</div>}
+      {error && <div aria-live="polite" className="bg-red-500/10 text-red-400 rounded-xl p-4 text-sm">{error}</div>}
 
       {result && (
         <>

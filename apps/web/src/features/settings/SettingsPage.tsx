@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect } from "react";
 import { useApi } from "@core/hooks";
 import { isAuthenticated, login } from "@core/api";
-import { MetricCard, MetricCardSkeleton } from "@shared/ui";
+import { MetricCard, MetricCardSkeleton, useToast } from "@shared/ui";
 import { useT } from "@core/i18n";
 import { langLabels, type Lang } from "@core/i18n";
 import { systemApi } from "./api";
 
 export function SettingsPage({ onSave }: { onSave?: () => void } = {}) {
   const { t, lang, setLang } = useT();
+  const { toast } = useToast();
   const { data: status, loading } = useApi(systemApi.status);
   const [key, setKey] = useState("");
   const [saved, setSaved] = useState(false);
@@ -23,6 +24,7 @@ export function SettingsPage({ onSave }: { onSave?: () => void } = {}) {
     try {
       await login(key);
       setSaved(true);
+      toast("success", t.toast.settingsSaved);
       onSave?.();
       timerRef.current = setTimeout(() => setSaved(false), 2000);
     } catch (err) {

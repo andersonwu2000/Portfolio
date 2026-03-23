@@ -30,12 +30,15 @@ export function useBacktest() {
       const MAX_POLL_MS = 30 * 60 * 1000;
       const pollStart = Date.now();
       let status = summary.status;
+      let attempt = 0;
       while (status === "running" && mountedRef.current) {
         if (Date.now() - pollStart > MAX_POLL_MS) {
           setError(t.backtest.timedOut);
           return null;
         }
-        await new Promise((r) => setTimeout(r, 2000));
+        const delay = Math.min(2000 * 2 ** attempt, 30000);
+        attempt++;
+        await new Promise((r) => setTimeout(r, delay));
         if (!mountedRef.current) break;
         const s = await backtestApi.status(summary.task_id);
         status = s.status;

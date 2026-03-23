@@ -36,11 +36,11 @@ export function Sidebar({ onLogout }: { onLogout?: () => void }) {
         ) : (
           <>
             <h1 className="text-lg font-bold tracking-tight">{t.appName}</h1>
-            <p className="text-xs text-slate-500 mt-0.5">{t.appVersion}</p>
+            <p className="text-xs text-slate-400 mt-0.5">{t.appVersion}</p>
           </>
         )}
       </div>
-      <nav className="flex-1 py-3 px-2 space-y-0.5">
+      <nav role="navigation" aria-label="Main navigation" className="flex-1 py-3 px-2 space-y-0.5">
         {links.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
@@ -73,6 +73,7 @@ export function Sidebar({ onLogout }: { onLogout?: () => void }) {
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           className="flex items-center justify-center py-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-surface transition-colors w-full"
         >
           {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}

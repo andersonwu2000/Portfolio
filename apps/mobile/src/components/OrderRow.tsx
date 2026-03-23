@@ -1,8 +1,9 @@
 import { View, Text, StyleSheet } from "react-native";
 import type { OrderInfo } from "@quant/shared";
+import { success, danger, surfaceLight, textPrimary, textSecondary, textMuted } from "@/src/theme/colors";
 
 export function OrderRow({ order }: { order: OrderInfo }) {
-  const sideColor = order.side === "BUY" ? "#22C55E" : "#EF4444";
+  const sideColor = order.side === "BUY" ? success : danger;
   return (
     <View style={styles.row}>
       <View style={styles.left}>
@@ -26,13 +27,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#334155",
+    borderBottomColor: surfaceLight,
   },
   left: { flexDirection: "row", alignItems: "center", gap: 8 },
   right: { alignItems: "flex-end" },
-  symbol: { color: "#F1F5F9", fontWeight: "600", fontSize: 14 },
+  symbol: { color: textPrimary, fontWeight: "600", fontSize: 14 },
   side: { fontWeight: "600", fontSize: 12 },
-  qty: { color: "#94A3B8", fontSize: 12 },
-  status: { color: "#94A3B8", fontSize: 12 },
-  time: { color: "#64748B", fontSize: 11 },
+  qty: { color: textSecondary, fontSize: 12 },
+  status: { color: textSecondary, fontSize: 12 },
+  time: { color: textMuted, fontSize: 11 },
 });

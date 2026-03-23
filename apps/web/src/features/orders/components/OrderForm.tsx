@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ordersApi } from "../api";
 import { useT } from "@core/i18n";
+import { useToast } from "@shared/ui";
 
 interface Props {
   onSubmitted: () => void;
@@ -8,6 +9,7 @@ interface Props {
 
 export function OrderForm({ onSubmitted }: Props) {
   const { t } = useT();
+  const { toast } = useToast();
   const [symbol, setSymbol] = useState("");
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
   const [quantity, setQuantity] = useState("");
@@ -30,20 +32,23 @@ export function OrderForm({ onSubmitted }: Props) {
       setSymbol("");
       setQuantity("");
       setPrice("");
+      toast("success", t.toast.orderSubmitted);
       onSubmitted();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.common.orderFailed);
+      const msg = err instanceof Error ? err.message : t.common.orderFailed;
+      setError(msg);
+      toast("error", t.toast.orderFailed);
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-surface rounded-xl p-5 space-y-4">
+    <form onSubmit={handleSubmit} aria-label="New order form" className="bg-surface rounded-xl p-5 space-y-4">
       <p className="text-sm font-medium text-slate-400">{t.orders.newOrder}</p>
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <label className="space-y-1">
-          <span className="text-xs text-slate-500">{t.orders.symbol}</span>
+          <span className="text-xs text-slate-400">{t.orders.symbol}</span>
           <input
             value={symbol}
             onChange={(e) => setSymbol(e.target.value.toUpperCase())}
@@ -53,11 +58,12 @@ export function OrderForm({ onSubmitted }: Props) {
           />
         </label>
         <div className="space-y-1">
-          <span className="text-xs text-slate-500">{t.orders.side}</span>
+          <span className="text-xs text-slate-400">{t.orders.side}</span>
           <div className="flex gap-1">
             <button
               type="button"
               onClick={() => setSide("BUY")}
+              aria-pressed={side === "BUY"}
               className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
                 side === "BUY"
                   ? "bg-emerald-500/20 text-emerald-400"
@@ -69,6 +75,7 @@ export function OrderForm({ onSubmitted }: Props) {
             <button
               type="button"
               onClick={() => setSide("SELL")}
+              aria-pressed={side === "SELL"}
               className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
                 side === "SELL"
                   ? "bg-red-500/20 text-red-400"
@@ -80,7 +87,7 @@ export function OrderForm({ onSubmitted }: Props) {
           </div>
         </div>
         <label className="space-y-1">
-          <span className="text-xs text-slate-500">{t.orders.qty}</span>
+          <span className="text-xs text-slate-400">{t.orders.qty}</span>
           <input
             type="number"
             value={quantity}
@@ -91,7 +98,7 @@ export function OrderForm({ onSubmitted }: Props) {
           />
         </label>
         <label className="space-y-1">
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-slate-400">
             {t.orders.price} ({t.orders.mktIfEmpty})
           </span>
           <input

@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { useApi, useWs } from "@core/hooks";
 import { fmtDate, fmtTime, fmtNum } from "@core/utils";
-import { StatusBadge, ErrorAlert, InfoTooltip } from "@shared/ui";
+import { StatusBadge, ErrorAlert, InfoTooltip, useToast } from "@shared/ui";
 import { useT } from "@core/i18n";
 import { ShieldOff } from "lucide-react";
 import { riskApi } from "./api";
@@ -24,6 +24,7 @@ function getRuleDescKey(name: string): RuleDescKey | null {
 
 export function RiskPage() {
   const { t } = useT();
+  const { toast } = useToast();
   const { data: rules, error: rulesError, refresh: refreshRules } = useApi<RiskRule[]>(riskApi.rules);
   const { data: alerts, error: alertsError, refresh: refreshAlerts, setData: setAlerts } = useApi<RiskAlert[]>(riskApi.alerts);
   const [killMsg, setKillMsg] = useState<string | null>(null);
@@ -42,8 +43,9 @@ export function RiskPage() {
     try {
       await riskApi.toggleRule(name, !enabled);
       refreshRules();
+      toast("success", t.toast.ruleSaved);
     } catch {
-      // rule refresh will show current state
+      toast("error", t.toast.ruleSaved);
     } finally {
       setToggling(null);
     }
@@ -55,6 +57,7 @@ export function RiskPage() {
     try {
       const resp = await riskApi.killSwitch();
       setKillMsg(resp.detail);
+      toast("success", t.toast.killSwitchActivated);
     } catch (err) {
       setKillMsg(err instanceof Error ? err.message : "Kill switch failed");
     } finally {
@@ -68,6 +71,7 @@ export function RiskPage() {
         <h2 className="text-xl font-bold">{t.risk.title}</h2>
         <button onClick={handleKill}
           disabled={killLoading}
+          aria-label={t.risk.killSwitch}
           className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors">
           <ShieldOff size={16} /> {killLoading ? "..." : t.risk.killSwitch}
         </button>
@@ -92,6 +96,8 @@ export function RiskPage() {
                   <button
                     onClick={() => handleToggle(r.name, r.enabled)}
                     disabled={toggling === r.name}
+                    role="switch"
+                    aria-checked={r.enabled}
                     className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors disabled:opacity-50 ${
                       r.enabled
                         ? "bg-emerald-500/20 text-emerald-400"
@@ -109,12 +115,12 @@ export function RiskPage() {
 
       {alertsError && <ErrorAlert message={alertsError} onRetry={refreshAlerts} />}
       {!alertsError && (
-        <div className="bg-surface rounded-xl p-5">
+        <div className="bg-surface rounded-xl p-5" role="alert" aria-live="polite">
           <p className="text-sm font-medium text-slate-400 mb-3">{t.risk.recentAlerts}</p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-slate-500 border-b border-surface-light">
+                <tr className="text-slate-400 border-b border-surface-light">
                   <th className="text-left py-2">{t.risk.time}</th>
                   <th className="text-left py-2">{t.risk.rule}</th>
                   <th className="text-left py-2">{t.risk.severity}</th>

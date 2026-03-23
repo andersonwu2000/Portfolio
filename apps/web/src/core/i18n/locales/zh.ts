@@ -167,6 +167,15 @@ export const zh: Translations = {
     },
   },
 
+  // toast
+  toast: {
+    orderSubmitted: "訂單已成功送出",
+    orderFailed: "訂單送出失敗",
+    killSwitchActivated: "緊急停止已啟動",
+    ruleSaved: "規則已更新",
+    settingsSaved: "設定已儲存",
+  },
+
   // settings
   settings: {
     title: "系統設定",

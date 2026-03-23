@@ -6,6 +6,7 @@ import { PositionRow } from "../../src/components/PositionRow";
 import { fmtCurrency, fmtPct, pnlColor } from "../../src/utils/format";
 import { useT } from "@/src/i18n";
 import { useMemo } from "react";
+import { bg, textMuted, danger, textSecondary, textPrimary, blue } from "@/src/theme/colors";
 
 export default function DashboardScreen() {
   const { t } = useT();
@@ -35,13 +36,13 @@ export default function DashboardScreen() {
   const dailyColor = pnlColor(data.daily_pnl);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#0F172A" }} edges={["top"]}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: bg }} edges={["top"]}>
       <FlatList
         data={topPositions}
         keyExtractor={(item) => item.symbol}
         renderItem={({ item }) => <PositionRow position={item} />}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#3B82F6" />
+          <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={blue} />
         }
         ListHeaderComponent={
           <>
@@ -68,14 +69,14 @@ export default function DashboardScreen() {
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#0F172A" },
-  loading: { color: "#64748B", fontSize: 16 },
-  error: { color: "#EF4444", fontSize: 14, textAlign: "center", padding: 24 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: bg },
+  loading: { color: textMuted, fontSize: 16 },
+  error: { color: danger, fontSize: 14, textAlign: "center", padding: 24 },
   navHeader: { alignItems: "center", paddingVertical: 24 },
-  navLabel: { color: "#94A3B8", fontSize: 14 },
-  navValue: { color: "#F1F5F9", fontSize: 36, fontWeight: "800", marginTop: 4 },
+  navLabel: { color: textSecondary, fontSize: 14 },
+  navValue: { color: textPrimary, fontSize: 36, fontWeight: "800", marginTop: 4 },
   dailyPnl: { fontSize: 14, fontWeight: "600", marginTop: 4 },
   metricsRow: { flexDirection: "row", marginBottom: 24 },
-  sectionTitle: { color: "#F1F5F9", fontSize: 18, fontWeight: "700", marginBottom: 12 },
-  empty: { color: "#64748B", fontSize: 14, textAlign: "center", padding: 24 },
+  sectionTitle: { color: textPrimary, fontSize: 18, fontWeight: "700", marginBottom: 12 },
+  empty: { color: textMuted, fontSize: 14, textAlign: "center", padding: 24 },
 });

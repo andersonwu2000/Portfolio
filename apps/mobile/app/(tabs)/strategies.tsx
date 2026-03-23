@@ -5,6 +5,7 @@ import type { StrategyInfo } from "@quant/shared";
 import { strategies as api } from "@quant/shared";
 import { StrategyRow } from "../../src/components/StrategyRow";
 import { useT } from "@/src/i18n";
+import { bg, textSecondary, textMuted, blue } from "@/src/theme/colors";
 
 export default function StrategiesScreen() {
   const { t } = useT();
@@ -50,7 +51,7 @@ export default function StrategiesScreen() {
         keyExtractor={(item) => item.name}
         renderItem={({ item }) => <StrategyRow strategy={item} onToggle={handleToggle} />}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#3B82F6" />
+          <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={blue} />
         }
         ListHeaderComponent={
           <Text style={styles.header}>
@@ -65,7 +66,7 @@ export default function StrategiesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0F172A" },
-  header: { color: "#94A3B8", fontSize: 13, marginBottom: 16 },
-  empty: { color: "#64748B", fontSize: 14, textAlign: "center", padding: 24 },
+  container: { flex: 1, backgroundColor: bg },
+  header: { color: textSecondary, fontSize: 13, marginBottom: 16 },
+  empty: { color: textMuted, fontSize: 14, textAlign: "center", padding: 24 },
 });
