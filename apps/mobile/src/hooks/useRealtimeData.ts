@@ -14,7 +14,7 @@ export function useRealtimeData<T>(
   const [data, setData] = useState<T>(initialValue);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const wsRef = useRef<WSManager | null>(null);
+  const mountedRef = useRef(true);
   const fetchRef = useRef(fetchFn);
   const mergeRef = useRef(mergeFn);
   fetchRef.current = fetchFn;
@@ -23,33 +23,34 @@ export function useRealtimeData<T>(
   const refresh = useCallback(async () => {
     try {
       const result = await fetchRef.current();
+      if (!mountedRef.current) return;
       setData(result);
       setError(null);
       setCache(channel, result).catch(() => {});
     } catch (err) {
+      if (!mountedRef.current) return;
       setError(err instanceof Error ? err.message : "Request failed");
-      // On fetch error, try to return cached data
       try {
         const cached = await getCached<T>(channel);
-        if (cached !== null) setData(cached);
+        if (cached !== null && mountedRef.current) setData(cached);
       } catch {
         // ignore cache read errors
       }
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, [channel]);
 
   useEffect(() => {
+    mountedRef.current = true;
     refresh();
-  }, [refresh]);
 
-  useEffect(() => {
     const ws = new WSManager(channel);
-    wsRef.current = ws;
     ws.connect();
     const unsubscribe = ws.subscribe((update) => {
-      setData((prev) => mergeRef.current(prev, update));
+      if (mountedRef.current) {
+        setData((prev) => mergeRef.current(prev, update));
+      }
     });
 
     const sub = RNAppState.addEventListener("change", (state) => {
@@ -62,6 +63,7 @@ export function useRealtimeData<T>(
     });
 
     return () => {
+      mountedRef.current = false;
       sub.remove();
       unsubscribe();
       ws.disconnect();

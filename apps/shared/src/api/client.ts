@@ -68,7 +68,11 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   }
 
   if (res.status === 204) return undefined as T;
-  return res.json();
+  try {
+    return await res.json();
+  } catch {
+    throw new ApiError(res.status, "Invalid JSON response");
+  }
 }
 
 export const get = <T>(path: string) => request<T>("GET", path);

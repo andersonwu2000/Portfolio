@@ -136,22 +136,34 @@ describe("AdminPage", () => {
     });
   });
 
-  it("delete button triggers confirmation", async () => {
+  it("prevents deleting the last active admin", async () => {
+    setupUseApi();
+
+    renderWithProviders(<AdminPage />);
+
+    // deleteButtons[0] = alice (only admin) — should be blocked
+    const deleteButtons = screen.getAllByTitle("Delete User");
+    fireEvent.click(deleteButtons[0]);
+
+    expect(mockToast).toHaveBeenCalledWith("error", "Cannot delete the last active admin");
+    expect(window.confirm).not.toHaveBeenCalled();
+    expect(adminApi.deleteUser).not.toHaveBeenCalled();
+  });
+
+  it("delete non-admin triggers confirmation and API call", async () => {
     setupUseApi();
     vi.mocked(adminApi.deleteUser).mockResolvedValue({ message: "deleted" });
 
     renderWithProviders(<AdminPage />);
 
-    // Find delete buttons (Trash2 icons) — they have title="Delete User"
+    // deleteButtons[1] = bob (trader) — should proceed normally
     const deleteButtons = screen.getAllByTitle("Delete User");
-    expect(deleteButtons.length).toBe(2);
-
-    fireEvent.click(deleteButtons[0]);
+    fireEvent.click(deleteButtons[1]);
 
     expect(window.confirm).toHaveBeenCalledWith("Are you sure you want to delete this user?");
 
     await waitFor(() => {
-      expect(adminApi.deleteUser).toHaveBeenCalledWith(1);
+      expect(adminApi.deleteUser).toHaveBeenCalledWith(2);
     });
   });
 });

@@ -94,7 +94,10 @@ export function extractRoleFromJwt(token: string): UserRole {
   try {
     const parts = token.split(".");
     if (parts.length !== 3) return "viewer";
-    const payload = JSON.parse(atob(parts[1]));
+    // JWT uses base64url encoding: replace URL-safe chars and add padding
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+    const payload = JSON.parse(atob(padded));
     const role = payload.role;
     if (typeof role === "string" && role in ROLE_HIERARCHY) return role as UserRole;
     return "viewer";

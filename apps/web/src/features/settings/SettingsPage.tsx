@@ -80,7 +80,7 @@ export function SettingsPage({ onSave }: { onSave?: () => void } = {}) {
     }
   };
 
-  const canSubmit = loginMode === "apikey" ? key.trim() : username.trim() && password.trim();
+  const canSubmit = loginMode === "apikey" ? !!key.trim() : !!(username.trim() && password.trim());
 
   const handleChangePassword = async () => {
     if (newPassword !== confirmNewPassword) {
