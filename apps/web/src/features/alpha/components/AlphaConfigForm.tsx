@@ -10,10 +10,13 @@ const FACTORS: { name: FactorName; defaultDirection: 1 | -1 }[] = [
   { name: "mean_reversion",  defaultDirection: -1 },
   { name: "volatility",      defaultDirection: -1 },
   { name: "rsi",             defaultDirection: -1 },
-  { name: "pe_ratio",        defaultDirection: -1 },
-  { name: "pb_ratio",        defaultDirection: -1 },
-  { name: "roe",             defaultDirection:  1 },
-  { name: "revenue_growth",  defaultDirection:  1 },
+  { name: "ma_cross",        defaultDirection:  1 },
+  { name: "vpt",             defaultDirection:  1 },
+  { name: "reversal",        defaultDirection: -1 },
+  { name: "illiquidity",     defaultDirection:  1 },
+  { name: "ivol",            defaultDirection: -1 },
+  { name: "skewness",        defaultDirection: -1 },
+  { name: "max_ret",         defaultDirection: -1 },
 ];
 
 interface Props {

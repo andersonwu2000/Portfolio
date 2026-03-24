@@ -14,10 +14,13 @@ const FACTORS = [
   { name: "mean_reversion", label: "Mean Reversion" },
   { name: "volatility",     label: "Volatility" },
   { name: "rsi",            label: "RSI" },
-  { name: "pe_ratio",       label: "P/E Ratio" },
-  { name: "pb_ratio",       label: "P/B Ratio" },
-  { name: "roe",            label: "ROE" },
-  { name: "revenue_growth", label: "Rev. Growth" },
+  { name: "ma_cross",       label: "MA Cross" },
+  { name: "vpt",            label: "Volume-Price" },
+  { name: "reversal",       label: "Reversal" },
+  { name: "illiquidity",    label: "Illiquidity" },
+  { name: "ivol",           label: "Idio. Vol" },
+  { name: "skewness",       label: "Skewness" },
+  { name: "max_ret",        label: "Max Return" },
 ] as const;
 
 type FactorName = typeof FACTORS[number]["name"];

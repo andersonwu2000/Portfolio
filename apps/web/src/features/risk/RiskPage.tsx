@@ -15,6 +15,10 @@ const RULE_PREFIXES = [
   "fat_finger",
   "max_daily_trades",
   "max_order_vs_adv",
+  "price_circuit_breaker",
+  "max_asset_class_weight",
+  "max_currency_exposure",
+  "max_gross_leverage",
 ] as const;
 
 type RuleDescKey = typeof RULE_PREFIXES[number];

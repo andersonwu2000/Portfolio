@@ -26,6 +26,11 @@ export type {
   QuantileReturn,
   FactorReport,
   AlphaReport,
+  AssetClassName,
+  TacticalRequest,
+  TacticalResponse,
+  TacticalWeightItem,
+  MacroSignalItem,
 } from "./types";
 
 // API client
@@ -38,7 +43,7 @@ export { WSManager, initWs } from "./api/ws";
 export type { Channel } from "./api/ws";
 
 // Endpoints
-export { auth, system, portfolio, strategies, orders, backtest, risk, alpha } from "./api/endpoints";
+export { auth, system, portfolio, strategies, orders, backtest, risk, alpha, allocation } from "./api/endpoints";
 
 // Hooks / utilities
 export { pollBacktestResult } from "./hooks/pollBacktestResult";

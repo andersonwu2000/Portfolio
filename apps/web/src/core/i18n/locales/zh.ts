@@ -40,6 +40,7 @@ export const zh: Translations = {
     orders: "訂單",
     backtest: "回測",
     alpha: "Alpha",
+    allocation: "資產配置",
     risk: "風控",
     settings: "設定",
     admin: "使用者管理",
@@ -96,6 +97,12 @@ export const zh: Translations = {
       alpha: "Alpha 研究策略。使用可配置的因子管線（動量、均值回歸、RSI 等），含橫截面中性化、正交化、成本感知組合建構。",
       multi_asset: "多資產配置策略。兩層架構：戰術資產類別配置（宏觀因子 + 跨資產信號 + 市場狀態）→ 類別內選股 → 組合最佳化（Risk Parity / Black-Litterman）。",
     },
+  },
+
+  // allocation
+  allocation: {
+    title: "戰術配置",
+    subtitle: "根據宏觀因子、跨資產信號和市場狀態，計算各資產類別的戰術配置權重。",
   },
 
   // orders
@@ -260,6 +267,10 @@ export const zh: Translations = {
       fat_finger: "胖手指檢查。若限價訂單的指定價格偏離當前市價超過閾值（預設 5%），則拒絕。防止因手誤輸入錯誤價格（如多打一個零）造成災難性成交。",
       max_daily_trades: "每日交易次數上限。當天通過審核的訂單數量達到上限（預設 100 次）後停止新下單。可偵測策略失控循環或系統異常。",
       max_order_vs_adv: "單筆量佔平均日成交量（ADV）上限。若訂單股數超過 ADV 的設定比例（預設 10%），則拒絕。避免在流動性不足的標的下大單造成市場衝擊。",
+      price_circuit_breaker: "價格熔斷。當前市價偏離前收盤價超過閾值（預設 10%）時拒絕下單。防護閃崩、異常跳空等極端行情。",
+      max_asset_class_weight: "資產類別權重上限。下單後若單一資產類別（股票/ETF/期貨）佔 NAV 超過設定比例則拒絕。",
+      max_currency_exposure: "幣別暴露上限。下單後若單一幣別的總暴露超過 NAV 設定比例則拒絕。控制外匯風險。",
+      max_gross_leverage: "總槓桿上限。所有持倉絕對值加總除以 NAV 超過閾值（預設 1.5 倍）則拒絕。防止期貨過度槓桿。",
     },
   },
 

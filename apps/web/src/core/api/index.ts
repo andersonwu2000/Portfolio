@@ -8,6 +8,7 @@ export {
   risk as riskEndpoints,
   portfolio as portfolioEndpoints,
   alpha as alphaEndpoints,
+  allocation,
   pollBacktestResult,
 } from "@quant/shared";
 export type { Channel } from "@quant/shared";
@@ -34,4 +35,8 @@ export type {
   FactorReport,
   ICResult,
   QuantileReturn,
+  TacticalRequest,
+  TacticalResponse,
+  TacticalWeightItem,
+  MacroSignalItem,
 } from "@quant/shared";

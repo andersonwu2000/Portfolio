@@ -1,0 +1,1 @@
+export { AllocationPage } from "./AllocationPage";

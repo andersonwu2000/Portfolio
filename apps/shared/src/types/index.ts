@@ -162,10 +162,13 @@ export type FactorName =
   | "mean_reversion"
   | "volatility"
   | "rsi"
-  | "pe_ratio"
-  | "pb_ratio"
-  | "roe"
-  | "revenue_growth"
+  | "ma_cross"
+  | "vpt"
+  | "reversal"
+  | "illiquidity"
+  | "ivol"
+  | "skewness"
+  | "max_ret"
   | (string & {});
 
 export interface AlphaFactorSpec {

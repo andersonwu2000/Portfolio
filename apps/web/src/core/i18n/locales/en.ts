@@ -38,6 +38,7 @@ export const en = {
     orders: "Orders",
     backtest: "Backtest",
     alpha: "Alpha",
+    allocation: "Allocation",
     risk: "Risk",
     settings: "Settings",
     admin: "Users",
@@ -94,6 +95,12 @@ export const en = {
       alpha: "Alpha research strategy. Uses configurable factor pipeline (momentum, mean-reversion, RSI, etc.) with cross-sectional neutralization, orthogonalization, and cost-aware portfolio construction.",
       multi_asset: "Multi-asset allocation strategy. Two-layer approach: tactical asset class allocation (macro factors + cross-asset signals + regime) → within-class selection → portfolio optimization (Risk Parity / Black-Litterman).",
     },
+  },
+
+  // allocation
+  allocation: {
+    title: "Tactical Allocation",
+    subtitle: "Compute tactical asset class weights based on macro factors, cross-asset signals, and market regime.",
   },
 
   // orders
@@ -258,6 +265,10 @@ export const en = {
       fat_finger: "Fat-finger check. Rejects limit orders whose price deviates from the current market price by more than the threshold (default 5%). Protects against typos such as an extra zero in the price.",
       max_daily_trades: "Daily trade count cap. Stops new orders once the number of approved orders in the current calendar day reaches the limit (default 100). Detects runaway strategy loops or system bugs.",
       max_order_vs_adv: "Order size vs. average daily volume (ADV) limit. Rejects if the order quantity exceeds the set fraction of ADV (default 10%). Avoids excessive market impact on illiquid names.",
+      price_circuit_breaker: "Price circuit breaker. Rejects orders when the current market price deviates from the previous close by more than the threshold (default 10%). Protects against flash crashes and abnormal gaps.",
+      max_asset_class_weight: "Asset class weight limit. Rejects if a single asset class (equities, ETFs, or futures) exceeds the threshold percentage of NAV after the trade.",
+      max_currency_exposure: "Currency exposure limit. Rejects if total exposure to a single currency exceeds the threshold percentage of NAV. Controls foreign exchange risk.",
+      max_gross_leverage: "Gross leverage limit. Rejects if total gross exposure (sum of all position absolute values) divided by NAV exceeds the threshold (default 1.5x). Prevents excessive futures leverage.",
     },
   },
 
