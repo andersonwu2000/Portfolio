@@ -30,6 +30,21 @@ class AssetClass(Enum):
     ETF = "ETF"
 
 
+class Market(Enum):
+    TW = "tw"
+    US = "us"
+
+
+class SubClass(Enum):
+    """資產子類別 — 細分 ETF 暴露的底層資產。"""
+    STOCK = "stock"
+    ETF_EQUITY = "etf_equity"
+    ETF_BOND = "etf_bond"
+    ETF_COMMODITY = "etf_commodity"
+    ETF_MIXED = "etf_mixed"
+    FUTURE = "future"
+
+
 class OrderStatus(Enum):
     PENDING = "PENDING"
     SUBMITTED = "SUBMITTED"
@@ -55,14 +70,24 @@ class Severity(Enum):
 
 @dataclass(frozen=True)
 class Instrument:
-    """金融工具的靜態描述。"""
-    symbol: str                             # "2330.TW", "AAPL"
+    """
+    金融工具的靜態描述 — 統一模型，覆蓋股票/ETF/期貨。
+
+    所有可交易標的共用此模型。InstrumentRegistry 使用相同的 class。
+    """
+    symbol: str                             # "2330.TW", "AAPL", "ES=F", "TLT"
     name: str = ""
     asset_class: AssetClass = AssetClass.EQUITY
+    sub_class: SubClass = SubClass.STOCK
+    market: Market = Market.US
     currency: str = "TWD"
     lot_size: int = 1                       # 最小交易單位 (台股=1000)
     tick_size: Decimal = Decimal("0.01")
-    multiplier: Decimal = Decimal("1")      # 期貨/選擇權合約乘數
+    multiplier: Decimal = Decimal("1")      # 期貨合約乘數
+    margin_rate: Decimal | None = None      # 保證金比率（期貨）
+    commission_rate: Decimal = Decimal("0")  # per-instrument 手續費率 (0=使用 SimConfig)
+    tax_rate: Decimal = Decimal("0")        # per-instrument 稅率 (0=使用 SimConfig)
+    sector: str = ""
 
 
 @dataclass(frozen=True)

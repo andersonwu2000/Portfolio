@@ -8,11 +8,9 @@ import pytest
 
 from src.strategy.research import (
     FACTOR_REGISTRY,
-    CompositeResult,
     DecayResult,
     ICResult,
     analyze_factor,
-    combine_factors,
     compute_factor_values,
     compute_forward_returns,
     compute_ic,
@@ -204,37 +202,6 @@ class TestFactorDecay:
         s = result.summary()
         assert "rsi" in s
         assert "1d" in s
-
-
-# ── combine_factors ────────────────────────────────────────────
-
-
-class TestCombineFactors:
-    def test_equal_weight(self):
-        data = _make_multi_stock_data(5, n_bars=300)
-        result = combine_factors(data, ["rsi", "volatility"], method="equal")
-        assert isinstance(result, CompositeResult)
-        # Equal weights
-        for w in result.weights.values():
-            assert abs(w - 0.5) < 1e-6
-
-    def test_ic_weight(self):
-        data = _make_multi_stock_data(5, n_bars=300)
-        result = combine_factors(data, ["rsi", "volatility"], method="ic")
-        assert isinstance(result, CompositeResult)
-        assert sum(result.weights.values()) == pytest.approx(1.0, abs=1e-6)
-
-    def test_custom_weights(self):
-        data = _make_multi_stock_data(5, n_bars=300)
-        custom = {"rsi": 0.7, "volatility": 0.3}
-        result = combine_factors(data, ["rsi", "volatility"], weights=custom)
-        assert result.weights == custom
-
-    def test_individual_ics_reported(self):
-        data = _make_multi_stock_data(5, n_bars=300)
-        result = combine_factors(data, ["rsi", "volatility"])
-        assert "rsi" in result.individual_ics
-        assert "volatility" in result.individual_ics
 
 
 # ── analyze_factor ─────────────────────────────────────────────

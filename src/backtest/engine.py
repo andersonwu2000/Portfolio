@@ -133,7 +133,7 @@ class BacktestEngine:
         self._instruments: dict[str, Instrument] = {}
         for sym in config.universe:
             inst = registry.get_or_create(sym)
-            self._instruments[sym] = inst.to_legacy()  # type: ignore[assignment]
+            self._instruments[sym] = inst
 
         # 偵測是否為混幣別 universe
         currencies = {getattr(self._instruments[s], "currency", "TWD") for s in self._instruments}

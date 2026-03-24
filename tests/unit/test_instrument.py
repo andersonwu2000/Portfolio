@@ -4,7 +4,8 @@ from decimal import Decimal
 
 import pytest
 
-from src.instrument.model import AssetClass, Currency, Instrument, Market, SubClass
+from src.domain.models import AssetClass, Instrument, Market, SubClass
+
 from src.instrument.registry import InstrumentRegistry, _infer_instrument
 
 
@@ -12,28 +13,29 @@ class TestInstrumentModel:
     def test_defaults(self):
         inst = Instrument(symbol="AAPL")
         assert inst.asset_class == AssetClass.EQUITY
-        assert inst.currency == Currency.USD
-        assert inst.contract_size == Decimal("1")
+        assert inst.currency == "TWD"
+        assert inst.multiplier == Decimal("1")
 
     def test_frozen(self):
         inst = Instrument(symbol="AAPL")
         with pytest.raises(AttributeError):
             inst.symbol = "MSFT"  # type: ignore[misc]
 
-    def test_to_legacy(self):
-        inst = Instrument(symbol="2330.TW", name="台積電", market=Market.TW, currency=Currency.TWD)
-        legacy = inst.to_legacy()
-        assert legacy.symbol == "2330.TW"  # type: ignore[attr-defined]
-        assert legacy.currency == "TWD"  # type: ignore[attr-defined]
+    def test_unified_model(self):
+        """統一模型：domain/models.py 的 Instrument 就是唯一定義。"""
+        inst = Instrument(symbol="2330.TW", name="台積電", market=Market.TW, currency="TWD")
+        assert inst.symbol == "2330.TW"
+        assert inst.currency == "TWD"
+        assert inst.sub_class == SubClass.STOCK
 
     def test_futures_instrument(self):
         inst = Instrument(
             symbol="ES=F", name="S&P E-mini",
-            asset_class=AssetClass.FUTURES, sub_class=SubClass.FUTURE,
-            contract_size=Decimal("50"), margin_rate=Decimal("0.05"),
+            asset_class=AssetClass.FUTURE, sub_class=SubClass.FUTURE,
+            multiplier=Decimal("50"), margin_rate=Decimal("0.05"),
         )
-        assert inst.asset_class == AssetClass.FUTURES
-        assert inst.contract_size == Decimal("50")
+        assert inst.asset_class == AssetClass.FUTURE
+        assert inst.multiplier == Decimal("50")
         assert inst.margin_rate == Decimal("0.05")
 
 
@@ -42,7 +44,7 @@ class TestInferInstrument:
         inst = _infer_instrument("2330.TW")
         assert inst.market == Market.TW
         assert inst.asset_class == AssetClass.EQUITY
-        assert inst.currency == Currency.TWD
+        assert inst.currency == "TWD"
 
     def test_tw_etf(self):
         inst = _infer_instrument("0050.TW")
@@ -55,8 +57,8 @@ class TestInferInstrument:
 
     def test_us_futures(self):
         inst = _infer_instrument("ES=F")
-        assert inst.asset_class == AssetClass.FUTURES
-        assert inst.currency == Currency.USD
+        assert inst.asset_class == AssetClass.FUTURE
+        assert inst.currency == "USD"
 
     def test_bond_etf(self):
         inst = _infer_instrument("TLT")
@@ -110,10 +112,10 @@ class TestInstrumentRegistry:
         reg = InstrumentRegistry()
         reg.register(Instrument(symbol="AAPL", asset_class=AssetClass.EQUITY))
         reg.register(Instrument(symbol="SPY", asset_class=AssetClass.ETF))
-        reg.register(Instrument(symbol="ES=F", asset_class=AssetClass.FUTURES))
+        reg.register(Instrument(symbol="ES=F", asset_class=AssetClass.FUTURE))
         assert len(reg.by_asset_class(AssetClass.EQUITY)) == 1
         assert len(reg.by_asset_class(AssetClass.ETF)) == 1
-        assert len(reg.by_asset_class(AssetClass.FUTURES)) == 1
+        assert len(reg.by_asset_class(AssetClass.FUTURE)) == 1
 
     def test_load_defaults(self):
         reg = InstrumentRegistry()

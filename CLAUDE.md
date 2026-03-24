@@ -89,27 +89,18 @@ Key design decisions:
 - **All monetary values use `Decimal`**, never `float`.
 - **Timezone handling**: All DatetimeIndex data is normalized to tz-naive UTC. Both `HistoricalFeed.load()` and `YahooFeed._download()` strip timezone info.
 
-**Module boundaries**:
-- `src/instrument/` — Multi-asset instrument registry. `model.py` defines `Instrument` (frozen dataclass with asset_class/sub_class/market/currency/contract_size/margin_rate), `AssetClass` (EQUITY/ETF/FUTURES), `Market` (TW/US), `Currency` (TWD/USD), `SubClass` (STOCK/ETF_EQUITY/ETF_BOND/ETF_COMMODITY/FUTURE). `registry.py` provides `InstrumentRegistry` (get/get_or_create/search/by_market/by_asset_class/load_from_yaml). `_infer_instrument()` auto-detects asset type from symbol pattern. Coexists with legacy `src/domain/models.py` Instrument via `to_legacy()`.
-- `src/alpha/` — Alpha research layer. `pipeline.py` orchestrates end-to-end: universe filtering → factor computation → neutralization (market/industry/size) → orthogonalization (sequential/symmetric) → composite signal → quantile backtest → cost-aware portfolio construction. `AlphaStrategy` adapter in `strategy.py` wraps the pipeline as a standard `Strategy` subclass. Key modules: `universe.py` (stock pool filtering), `neutralize.py` (winsorize + standardize + 4 neutralization methods), `cross_section.py` (quantile portfolios, monotonicity, long-short), `turnover.py` (cost drag, breakeven cost, net IC), `orthogonalize.py` (Gram-Schmidt + PCA/ZCA), `construction.py` (turnover penalty, max turnover constraint, alpha decay blending). Configured via `AlphaConfig` dataclass.
-- `src/domain/models.py` — Frozen value objects (Instrument, Bar) + mutable aggregates (Position, Order, Portfolio, Trade). Portfolio supports T+N settlement (`pending_settlements`, `settled_cash`), multi-currency cash (`cash_by_currency`, `total_cash()`, `currency_exposure()`, `asset_class_weights()`).
-- `src/domain/repository.py` — `PortfolioRepository` for persisted portfolio CRUD (SQLAlchemy, single JOIN queries).
-- `src/strategy/` — Strategy ABC (`on_bar()` → weights), factor library (pure functions including fundamental factors `value_pe`, `value_pb`, `quality_roe`), optimizers (equal_weight, signal_weight, risk_parity), registry (auto-discovery from `strategies/` + `alpha` strategy), research (IC analysis, factor decay, factor combination).
-- `src/risk/` — RiskEngine executes declarative rules; `check_order()` for singles, `check_orders()` for batch filtering, `kill_switch()` at 5% daily drawdown (integrated into backtest loop). RiskMonitor tracks metrics and alerts on threshold breaches.
-- `src/execution/` — SimBroker (fixed/sqrt slippage models, commission/tax, price limits, volume checks, T+N settlement), OMS (order lifecycle with partial fills), `apply_trades()` updates Portfolio from Trade list.
-- `src/backtest/engine.py` — Orchestrates: download data → iterate trading dates → call strategy → risk check → execute → update portfolio. Engine `run()` delegates to 7 helper methods (`_refresh_bar_cache`, `_process_settlements`, `_execute_pending_orders`, `_execute_kill_switch`, `_inject_dividends_impl`, `_do_rebalance`, `_snap_nav`). Supports execution delay, dividend simulation, ffill limit.
-- `src/backtest/analytics.py` — 40+ performance metrics: Sharpe, Sortino, Calmar, max drawdown, win rate, VaR, CVaR, Hurst exponent.
-- `src/backtest/report.py` — HTML reports, benchmark comparisons, CSV exports, equity curves, return attribution.
-- `src/backtest/walk_forward.py` — Walk-forward analysis with rolling train/test windows.
-- `src/backtest/validation.py` — Causality, determinism, and sensitivity checks for backtest quality verification.
-- `src/data/sources/` — `YahooFeed`, `FinMindFeed` (TW stocks), factory `create_feed()`. Shared `ParquetDiskCache` for disk caching. `FinMindFundamentals` provides PE/PB/ROE/revenue/dividends/sector. `FredDataSource` for US macro data (FEDFUNDS, DGS10, CPI, VIX, etc.) with Parquet cache.
-- `src/data/feed.py` — `DataFeed` ABC: `get_bars()`, `get_latest_price()`, `get_universe()`, `get_fx_rate()` (FX pair lookup), `get_futures_chain()`. `HistoricalFeed` for backtesting with time causality enforcement.
-- `src/data/fundamentals.py` — `FundamentalsProvider` ABC for fundamental data.
-- `src/data/user_store.py` — `UserDataStore`: local SQLite persistence for user-uploaded CSV data.
-- `src/data/quality.py` — Data quality checks: NaN detection, OHLC logic validation, volume consistency.
-- `src/notifications/` — Multi-channel notifications (Discord, LINE, Telegram) with trade/rebalance/alert formatting.
-- `src/scheduler/` — APScheduler-based job scheduling for daily snapshots and weekly rebalance checks.
-- `src/api/` — FastAPI REST + WebSocket. `AppState` singleton holds runtime state. JWT auth with role hierarchy (viewer < researcher < trader < risk_manager < admin). Prometheus metrics via `prometheus-fastapi-instrumentator`.
+**Module boundaries** (detailed inventory in `docs/dev/SYSTEM_STATUS_REPORT.md` §4):
+- `src/domain/models.py` — **Unified** Instrument (frozen, with asset_class/sub_class/market/currency/multiplier/margin_rate/commission_rate/tax_rate), Bar, Position, Order, Portfolio (multi-currency: `cash_by_currency`, `nav_in_base(fx_rates)`, `currency_exposure()`), Trade. Enums: AssetClass (EQUITY/FUTURE/OPTION/ETF), Market (TW/US), SubClass, Side, OrderStatus.
+- `src/instrument/` — `InstrumentRegistry` (get/get_or_create/search/by_market/by_asset_class). Re-exports Instrument from domain. `_infer_instrument()` auto-detects asset type from symbol pattern. Cost templates (TW_STOCK_DEFAULTS, US_FUTURES_DEFAULTS, etc.).
+- `src/alpha/` — Alpha research layer. `pipeline.py` orchestrates end-to-end: universe filtering → factor computation → neutralization (market/industry/size) → orthogonalization (sequential/symmetric) → composite signal → quantile backtest → cost-aware portfolio construction. `AlphaStrategy` adapter in `strategy.py` wraps the pipeline as a standard `Strategy` subclass. Configured via `AlphaConfig` dataclass.
+- `src/strategy/` — Strategy ABC (`on_bar()` → weights), factor library (pure functions), optimizers (equal_weight, signal_weight, risk_parity), registry (auto-discovery from `strategies/` + `alpha` strategy), research (IC analysis, factor decay).
+- `src/risk/` — RiskEngine executes declarative rules; `kill_switch()` at 5% daily drawdown. RiskMonitor tracks metrics.
+- `src/execution/` — SimBroker (slippage, per-instrument commission/tax, T+N settlement), OMS (order lifecycle).
+- `src/backtest/` — BacktestEngine (InstrumentRegistry integration, multi-currency detection), 40+ analytics, HTML/CSV reports, walk-forward, validation.
+- `src/data/` — DataFeed ABC (`get_bars`, `get_fx_rate`, `get_futures_chain`), YahooFeed (retry/rate-limit), FinMindFeed, FredDataSource (macro data), ParquetDiskCache.
+- `src/api/` — FastAPI REST + WebSocket, 9 route modules (incl. `/alpha`), JWT auth, Prometheus.
+- `src/notifications/` — Discord / LINE / Telegram.
+- `src/scheduler/` — APScheduler (daily snapshots, weekly rebalance).
 
 **Adding a new strategy**: Create a file in `strategies/`, subclass `Strategy` from `src/strategy/base.py`, implement `name()` and `on_bar(ctx) -> dict[str, float]`. Register it in `_resolve_strategy()` in both `src/api/routes/backtest.py` and `src/cli/main.py`.
 

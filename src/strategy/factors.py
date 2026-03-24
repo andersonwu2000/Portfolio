@@ -134,28 +134,6 @@ def quality_roe(roe: float) -> float:
     return min(roe / 30.0, 1.0)
 
 
-def revenue_momentum(revenues: pd.Series, periods: int = 3) -> float:
-    """Revenue momentum: average MoM growth over recent periods.
-
-    Args:
-        revenues: Series of revenue values (chronologically ordered)
-        periods: Number of recent periods to average
-
-    Returns:
-        Average month-over-month growth rate (as decimal, e.g., 0.05 = 5%)
-    """
-    if len(revenues) < periods + 1:
-        return 0.0
-
-    recent = revenues.iloc[-(periods + 1) :]
-    growths = recent.pct_change().dropna()
-
-    if growths.empty:
-        return 0.0
-
-    return float(growths.mean())
-
-
 def short_term_reversal(prices: pd.DataFrame, lookback: int = 5) -> pd.Series:
     """
     短期反轉因子：過去 lookback 天報酬的負值。

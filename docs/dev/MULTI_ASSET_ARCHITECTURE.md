@@ -77,7 +77,7 @@
 
 #### Instrument Registry (`src/instrument/`)
 
-現有的 `Instrument` dataclass 只有 symbol + name + asset_class。需要擴展為完整的金融工具模型：
+✅ **已完成**：統一 Instrument 定義在 `src/domain/models.py`，`src/instrument/` 提供 Registry + 預設模板。
 
 ```python
 @dataclass(frozen=True)
@@ -312,12 +312,7 @@ stress_test_limit()         # 壓力測試情境下最大虧損
 
 ### Phase A：基礎設施升級
 
-| 任務 | 說明 |
-|------|------|
-| Instrument Registry | 統一標的模型，支援各資產類型 metadata |
-| Multi-Currency Portfolio | 多幣別現金、匯率轉換、幣別暴露計算 |
-| 擴展 DataFeed | 增加期貨合約鏈、匯率 (TWD/USD) 數據 |
-| FRED 數據源 | 美國宏觀經濟數據 (GDP, CPI, 利率) |
+✅ **已完成**：Instrument Registry、多幣別 Portfolio、DataFeed 擴展、FRED 數據源、管線整合 (D-01~D-07)、模型統一。
 
 ### Phase B：跨資產 Alpha
 

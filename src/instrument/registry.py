@@ -14,7 +14,6 @@ from typing import Any
 
 from src.instrument.model import (
     AssetClass,
-    Currency,
     Instrument,
     Market,
     SubClass,
@@ -156,7 +155,7 @@ def _infer_instrument(symbol: str) -> Instrument:
 
     # 外匯: =X 結尾 — 不納入交易，但可用於匯率查詢
     if s.endswith("=X"):
-        return Instrument(symbol=symbol, name=symbol, market=Market.US, currency=Currency.USD)
+        return Instrument(symbol=symbol, name=symbol, market=Market.US, currency="USD")
 
     # 已知美股 ETF
     _KNOWN_BOND_ETFS = {"TLT", "IEF", "SHY", "LQD", "HYG", "AGG", "BND", "VCIT", "VCSH"}
@@ -188,9 +187,9 @@ def _infer_instrument(symbol: str) -> Instrument:
 
 def _dict_to_instrument(d: dict[str, Any]) -> Instrument:
     """從 dict 建構 Instrument。"""
-    ac_map = {"equity": AssetClass.EQUITY, "etf": AssetClass.ETF, "futures": AssetClass.FUTURES}
+    ac_map = {"equity": AssetClass.EQUITY, "etf": AssetClass.ETF, "futures": AssetClass.FUTURE, "future": AssetClass.FUTURE}
     mkt_map = {"tw": Market.TW, "us": Market.US}
-    cur_map = {"TWD": Currency.TWD, "USD": Currency.USD}
+    cur_map = {"TWD": "TWD", "USD": "USD"}
     sc_map = {
         "stock": SubClass.STOCK, "etf_equity": SubClass.ETF_EQUITY,
         "etf_bond": SubClass.ETF_BOND, "etf_commodity": SubClass.ETF_COMMODITY,
@@ -203,8 +202,8 @@ def _dict_to_instrument(d: dict[str, Any]) -> Instrument:
         asset_class=ac_map.get(d.get("asset_class", "equity"), AssetClass.EQUITY),
         sub_class=sc_map.get(d.get("sub_class", "stock"), SubClass.STOCK),
         market=mkt_map.get(d.get("market", "us"), Market.US),
-        currency=cur_map.get(d.get("currency", "USD"), Currency.USD),
-        contract_size=Decimal(str(d.get("contract_size", 1))),
+        currency=cur_map.get(d.get("currency", "USD"), "USD"),
+        multiplier=Decimal(str(d.get("multiplier", 1))),
         tick_size=Decimal(str(d.get("tick_size", "0.01"))),
         lot_size=int(d.get("lot_size", 1)),
         margin_rate=Decimal(str(d["margin_rate"])) if d.get("margin_rate") else None,
@@ -227,7 +226,7 @@ def _default_instruments() -> list[Instrument]:
     ]
     for sym, name, size in tw_futures:
         instruments.append(Instrument(
-            symbol=sym, name=name, contract_size=size,
+            symbol=sym, name=name, multiplier=size,
             margin_rate=Decimal("0.10"), **{k: v for k, v in TW_FUTURES_DEFAULTS.items() if k not in ("margin_rate",)},  # type: ignore[arg-type]
         ))
 
@@ -242,7 +241,7 @@ def _default_instruments() -> list[Instrument]:
     ]
     for sym, name, size, tick in us_futures:
         instruments.append(Instrument(
-            symbol=sym, name=name, contract_size=size, tick_size=tick,
+            symbol=sym, name=name, multiplier=size, tick_size=tick,
             margin_rate=Decimal("0.05"),
             **{k: v for k, v in US_FUTURES_DEFAULTS.items() if k not in ("margin_rate",)},  # type: ignore[arg-type]
         ))
