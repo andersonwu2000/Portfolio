@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
 
@@ -101,7 +103,7 @@ def orthogonalize_symmetric(
     result_dfs = {name: factor_dict[name].copy() for name in names}
 
     # 取共同日期
-    common_dates: set | None = None
+    common_dates: set[Any] | None = None
     for df in factor_dict.values():
         if common_dates is None:
             common_dates = set(df.index)
@@ -174,7 +176,7 @@ def factor_correlation_matrix(
         return pd.DataFrame(1.0, index=names, columns=names)
 
     # 取共同日期
-    common_dates: set | None = None
+    common_dates: set[Any] | None = None
     for df in factor_dict.values():
         if common_dates is None:
             common_dates = set(df.index)

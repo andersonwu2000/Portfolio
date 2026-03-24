@@ -91,7 +91,7 @@ def quantile_backtest(
 
         # 分組：按因子值排序，分成 n_quantiles 組
         try:
-            quantile_labels = pd.qcut(fv_sorted.rank(method="first"), n_quantiles, labels=q_labels)
+            quantile_labels = pd.qcut(fv_sorted.rank(method="first"), n_quantiles, labels=q_labels)  # type: ignore[call-overload]
         except ValueError:
             continue
 

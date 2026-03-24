@@ -122,7 +122,7 @@ class FredDataSource:
             return None
 
     def _fetch_fredapi(self, series_id: str, start: str | None, end: str | None) -> pd.Series:
-        from fredapi import Fred
+        from fredapi import Fred  # type: ignore[import-not-found]
 
         fred = Fred(api_key=self._api_key)
         data = fred.get_series(series_id, observation_start=start, observation_end=end)

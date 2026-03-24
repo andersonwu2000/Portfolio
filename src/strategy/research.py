@@ -270,11 +270,11 @@ def compute_factor_values(
             continue
 
         # 找出此標的在 dates 中有數據的日期
-        sym_dates = [dt for dt in dates if dt in idx or (len(idx) > 0 and idx[0] <= dt)]
+        valid_dates = [dt for dt in dates if dt in idx or (len(idx) > 0 and idx[0] <= dt)]
 
         values: dict[pd.Timestamp, float] = {}
         # 使用 searchsorted 批量定位，避免逐日 boolean mask
-        for dt in sym_dates:
+        for dt in valid_dates:
             pos = idx.searchsorted(dt, side="right")
             if pos < min_bars:
                 continue

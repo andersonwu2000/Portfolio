@@ -18,7 +18,7 @@ from src.api.state import get_app_state
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/alpha", tags=["alpha"])
 _limiter = Limiter(key_func=get_remote_address)
-_background_tasks: set[asyncio.Task[None]] = set()
+_background_tasks: set[asyncio.Future[None]] = set()
 
 
 # ── Request / Response schemas ───────────────────────────────────
@@ -217,7 +217,8 @@ async def get_alpha_result(
         raise HTTPException(status_code=400, detail=f"Task is {task['status']}, not completed")
     if not task.get("result"):
         raise HTTPException(status_code=500, detail="Result missing")
-    return task["result"]
+    result: dict[str, Any] = task["result"]
+    return result
 
 
 # ── 格式轉換 ─────────────────────────────────────────────────
@@ -252,7 +253,7 @@ def _format_report(report: Any, task_id: str, req: AlphaRunRequest) -> dict[str,
                 ]
             ic_out["ic_series"] = ic_series
 
-        to_out = {"avg_turnover": 0, "cost_drag_annual_bps": 0, "breakeven_cost_bps": 0}
+        to_out = {"avg_turnover": 0.0, "cost_drag_annual_bps": 0.0, "breakeven_cost_bps": 0.0}
         if to:
             to_out = {
                 "avg_turnover": to.avg_turnover,

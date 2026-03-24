@@ -101,7 +101,7 @@ def blend_with_decay(
     new_aligned = new_signal.reindex(all_symbols, fill_value=0.0)
     old_aligned = old_signal.reindex(all_symbols, fill_value=0.0)
 
-    blended = decay_weight * old_aligned + (1 - decay_weight) * new_aligned
+    blended: pd.Series = decay_weight * old_aligned + (1 - decay_weight) * new_aligned
     return blended
 
 

@@ -127,8 +127,9 @@ class YahooFeed(DataFeed):
         df = df[["open", "high", "low", "close", "volume"]].copy()
 
         # 統一為 tz-naive 避免比較問題
-        if df.index.tz is not None:
-            df.index = df.index.tz_convert("UTC").tz_localize(None)
+        dti = pd.DatetimeIndex(df.index)
+        if dti.tz is not None:
+            df.index = dti.tz_convert("UTC").tz_localize(None)
 
         df = df.sort_index()
 
