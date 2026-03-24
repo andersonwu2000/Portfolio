@@ -143,10 +143,15 @@ async def submit_alpha_research(
                     logger.debug("Failed to fetch %s", symbol, exc_info=True)
                     return (symbol, None)
 
-            with ThreadPoolExecutor(max_workers=8) as pool:
+            with ThreadPoolExecutor(max_workers=4) as pool:
                 futures = {pool.submit(_fetch, sym): sym for sym in req.universe}
-                for future in as_completed(futures):
-                    sym, bars = future.result()
+                for future in as_completed(futures, timeout=120):
+                    try:
+                        sym, bars = future.result(timeout=60)
+                    except Exception:
+                        done_count += 1
+                        update_progress(done_count)
+                        continue
                     if bars is not None:
                         data[sym] = bars
                     done_count += 1
@@ -157,7 +162,7 @@ async def submit_alpha_research(
                 state.alpha_tasks[task_id]["error"] = "No data available for the given universe and date range"
                 return
 
-            update_progress(2)
+            update_progress(len(req.universe))
 
             # 執行研究
             report = pipeline.research(data)

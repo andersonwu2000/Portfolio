@@ -22,7 +22,7 @@ Multi-asset portfolio research and optimization system covering TW stocks, US st
 Monorepo: Python backend + React web + React Native mobile. Targets Taiwan stock market defaults (commission 0.1425%, sell tax 0.3%) but works with any market via Yahoo Finance or FinMind.
 
 **Monorepo structure:**
-- `src/`, `tests/`, `strategies/`, `migrations/` — Python backend (79 files, ~12,200 LOC)
+- `src/`, `tests/`, `strategies/`, `migrations/` — Python backend (110 files, ~17,700 LOC)
 - `apps/web/` — React 18 + Vite + Tailwind dashboard (incl. Alpha Research page)
 - `apps/mobile/` — React Native + Expo 52 mobile app (incl. Alpha tab)
 - `apps/shared/` — `@quant/shared` TypeScript package (types, API client, WS manager, format utils)
@@ -42,7 +42,7 @@ Frontend workspace managed by bun (`apps/package.json` workspaces).
 
 ```bash
 # === Backend ===
-make test                    # pytest tests/ -v (555 tests)
+make test                    # pytest tests/ -v (726 tests)
 make lint                    # ruff check + mypy strict
 make dev                     # API with hot reload (port 8000)
 make api                     # production API
@@ -97,10 +97,10 @@ Key design decisions:
 - `src/portfolio/` — Multi-asset portfolio optimization. `optimizer.py`: 6 methods (EW/InverseVol/RiskParity/MVO/BlackLitterman/HRP), `BLView` for views, `OptimizationResult` with risk/return/Sharpe/risk contributions. `risk_model.py`: covariance estimation (historical/EWM/Ledoit-Wolf shrinkage), correlation, volatilities, portfolio risk, marginal risk contribution. `currency.py`: `CurrencyHedger` with tiered hedge ratios, `HedgeRecommendation`.
 - `src/strategy/` — Strategy ABC (`on_bar()` → weights), factor library (pure functions), optimizers (equal_weight, signal_weight, risk_parity), registry (auto-discovery from `strategies/` + `alpha` strategy), research (IC analysis, factor decay).
 - `src/risk/` — RiskEngine executes declarative rules; `kill_switch()` at 5% daily drawdown. RiskMonitor tracks metrics.
-- `src/execution/` — SimBroker (slippage, per-instrument commission/tax, T+N settlement), OMS (order lifecycle).
+- `src/execution/` — SimBroker (slippage, per-instrument commission/tax, T+N settlement), OMS (order lifecycle), SinopacBroker (Shioaji SDK wrapper), ExecutionService (mode-aware routing: backtest/paper/live), SinopacQuoteManager (tick/bidask subscription), market hours validation, EOD reconciliation.
 - `src/backtest/` — BacktestEngine (InstrumentRegistry integration, multi-currency detection), 40+ analytics, HTML/CSV reports, walk-forward, validation.
 - `src/data/` — DataFeed ABC (`get_bars`, `get_fx_rate`, `get_futures_chain`), YahooFeed (retry/rate-limit), FinMindFeed, FredDataSource (macro data), ParquetDiskCache.
-- `src/api/` — FastAPI REST + WebSocket, 9 route modules (incl. `/alpha`), JWT auth, Prometheus.
+- `src/api/` — FastAPI REST + WebSocket, 12 route modules (incl. `/alpha`, `/allocation`, `/execution`), JWT auth, Prometheus.
 - `src/notifications/` — Discord / LINE / Telegram.
 - `src/scheduler/` — APScheduler (daily snapshots, weekly rebalance).
 
@@ -125,6 +125,10 @@ Key design decisions:
 - `GET /api/v1/risk/rules` — Risk rule status
 - `POST /api/v1/risk/kill-switch` — Kill switch control
 - `GET /api/v1/system/health` — Health check
+- `GET /api/v1/execution/status` — Execution service status
+- `GET /api/v1/execution/market-hours` — Current trading session
+- `POST /api/v1/execution/reconcile` — EOD position reconciliation
+- `GET /api/v1/execution/paper-trading/status` — Paper trading status
 
 **Middleware & cross-cutting concerns**:
 - `src/api/middleware.py` — AuditMiddleware logs all mutation requests (POST/PUT/DELETE) with user, path, status, duration
@@ -212,7 +216,7 @@ Key design decisions:
 
 **CI/CD** (`.github/workflows/ci.yml`) — 9 jobs:
 - `backend-lint` — ruff check + mypy strict
-- `backend-test` — pytest (325 tests)
+- `backend-test` — pytest (726 tests)
 - `web-typecheck` — tsc --noEmit
 - `web-test` — vitest (depends on web-typecheck)
 - `web-build` — vite build (depends on web-typecheck)

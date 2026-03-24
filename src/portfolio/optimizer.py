@@ -15,8 +15,10 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 from scipy.cluster.hierarchy import linkage, leaves_list
 from scipy.spatial.distance import squareform
@@ -309,7 +311,7 @@ class PortfolioOptimizer:
     def _hrp_bisect(
         self,
         ordered: list[str],
-        sigma: np.ndarray,
+        sigma: npt.NDArray[np.floating[Any]],
         all_symbols: list[str],
     ) -> dict[str, float]:
         """HRP 遞迴平分。"""
@@ -358,7 +360,7 @@ class PortfolioOptimizer:
     @staticmethod
     def _cluster_var(
         cluster: list[str],
-        sigma: np.ndarray,
+        sigma: npt.NDArray[np.floating[Any]],
         sym_idx: dict[str, int],
     ) -> float:
         """子群的等權組合變異數。"""

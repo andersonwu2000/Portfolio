@@ -1,6 +1,6 @@
 # 開發計畫書
 
-> **版本**: v4.0
+> **版本**: v4.2
 > **日期**: 2026-03-25
 > **目標**: 涵蓋多個可自動交易市場的投資組合研究與優化系統
 > **可交易市場**: 台股、美股、ETF（含債券/商品 ETF 代理）、台灣期貨、美國期貨
@@ -15,11 +15,11 @@
 Phase A ✅       Phase B ✅       Phase C ✅       Phase D ✅       Phase E (當前)
 基礎設施          跨資產 Alpha     組合最佳化        系統整合+風控     實盤交易
 ─────────       ────────────    ─────────       ─────────       ─────────
-Instrument      宏觀因子模型      6 種最佳化器     MultiAssetStrategy  券商對接
+Instrument      宏觀因子模型      6 種最佳化器     MultiAssetStrategy  Shioaji 券商對接
 多幣別 Portfolio  跨資產信號       風險模型(LW)     跨資產風控規則      Paper Trading
-DataFeed 擴展   戰術配置引擎      幣別對沖         FX per-bar 修復    即時行情
-FRED 數據源     API + 前端型別                    Allocation 前端    多資產前端
-管線整合                                         因子/型別同步
+DataFeed 擴展   戰術配置引擎      幣別對沖         FX per-bar 修復    即時行情(tick)
+FRED 數據源     API + 前端型別                    Alpha層強化        IB 美股(第二階段)
+管線整合                                         因子/型別同步       EOD 對帳
 ```
 
 ---
@@ -40,42 +40,202 @@ InstrumentRegistry (自動推斷) + 多幣別 Portfolio (`nav_in_base`, `currenc
 - 跨資產風控: `max_asset_class_weight`, `max_currency_exposure`, `max_gross_leverage`
 - Bug fixes: FX per-bar 更新 / 總權重驗證 / FRED ffill(66)
 - 前端: AllocationPage + 11 因子同步 + 跨資產風控規則 + i18n (en/zh)
+- Alpha 層強化: 5 新技術因子 (reversal/illiquidity/ivol/skewness/max_ret) + Rolling IC 動態加權 + 市場環境分析 (`src/alpha/regime.py`) + 因子歸因 (`src/alpha/attribution.py`)
 
 ---
 
 ## Phase E：實盤交易（當前目標）
 
-### E1: 券商對接
+> 券商：台股使用 **永豐金 Shioaji** SDK（評估見 `docs/dev/BROKER_API_EVALUATION.md`）
+> 認證方式：API Key + Secret Key → CA 憑證啟用（`.pfx`） → 下單
+> 模擬模式：`sj.Shioaji(simulation=True)` 可完整測試下單/行情/帳務
+> SDK Skill 參考：`shioaji` skill（完整 API 文檔）
+
+### E1: SinopacBroker 核心 ✅
+
+| 檔案 | 內容 | 狀態 |
+|------|------|------|
+| `src/execution/sinopac_broker.py` | `SinopacBroker(BrokerAdapter)` — 封裝 Shioaji SDK | ✅ |
+| `src/execution/sinopac_quote.py` | 即時行情訂閱 — tick/bidask callback → TickData/BidAskData | ✅ |
+| `src/execution/execution_service.py` | 模式路由：backtest → SimBroker, paper/live → SinopacBroker | ✅ |
+| `src/execution/market_hours.py` | 台股交易時段驗證 + 盤外委託佇列 | ✅ |
+| `src/execution/reconcile.py` | EOD 持倉對帳 + 自動修正 | ✅ |
+| `src/api/routes/execution.py` | 6 個 Execution API 端點 | ✅ |
+| `tests/unit/test_sinopac_*.py` | 83 tests（全部 mock SDK） | ✅ |
+
+**SDK 認證**（已對齊官方 API）:
+```python
+api = sj.Shioaji(simulation=True)
+api.login(api_key="YOUR_KEY", secret_key="YOUR_SECRET")
+api.activate_ca(ca_path="/path/to/Sinopac.pfx", ca_passwd="PASSWORD")
+```
+
+**委託類型映射**（已實作）:
+
+| 本專案 | Shioaji 常數 |
+|--------|-------------|
+| `OrderType.MARKET` | `sj.constant.StockPriceType.MKT` |
+| `OrderType.LIMIT` | `sj.constant.StockPriceType.LMT` |
+| `Side.BUY / SELL` | `sj.constant.Action.Buy / Sell` |
+| 整股 | `sj.constant.StockOrderLot.Common` |
+| 盤中零股 | `sj.constant.StockOrderLot.IntradayOdd` |
+| ROD/IOC/FOK | `sj.constant.OrderType.ROD / IOC / FOK` |
+
+**回報機制**（已實作）:
+```python
+# OrderState 分發: StockOrder → 委託回報, StockDeal → 成交回報
+api.set_order_callback(lambda stat, msg: ...)
+```
+
+### E2: 即時行情整合
+
+填補 WebSocket `market` 頻道，連接 Shioaji 即時行情。
+
+| 元件 | 說明 | 狀態 |
+|------|------|------|
+| `SinopacQuoteManager` | tick/bidask 訂閱 + callback → TickData | ✅ 架構 |
+| WS broadcast | `market` 頻道接收 tick → 廣播前端 | 待整合 |
+| 前端 MarketTicker | 接收 WebSocket market 頻道 | 待實作 |
+
+**Shioaji 行情 Callback**（已對齊官方 API）:
+- 股票: `api.quote.set_on_tick_stk_v1_callback(fn)` / `set_on_bidask_stk_v1_callback(fn)`
+- 期貨: `api.quote.set_on_tick_fop_v1_callback(fn)` / `set_on_bidask_fop_v1_callback(fn)`
+- 事件: `@api.quote.on_event` — 斷線(2)/重連(4)/訂閱成功(16)
+
+**待實作**:
+- [ ] WS `market` 頻道整合 `SinopacQuoteManager.to_ws_payload()`
+- [ ] 自動重訂閱（`event_code == 4` → `resubscribe_all()`）
+- [ ] 盤中零股行情（`intraday_odd=True`）
+
+### E3: Paper Trading 完整循環
+
+使用 Shioaji `simulation=True` 模式的完整交易循環。
+
+**流程**:
+```
+排程觸發 (scheduler)
+  → Strategy.on_bar(ctx) → target weights
+    → weights_to_orders() → list[Order]
+      → RiskEngine.check_orders() → approved orders
+        → ExecutionService.submit_orders()
+          → SinopacBroker(simulation=True).submit_order()
+            → set_order_callback → Order 狀態更新
+              → apply_trades() → Portfolio 更新
+                → EOD reconcile() → 對帳
+                  → 通知 (Discord/LINE/Telegram)
+```
+
+| 子任務 | 說明 | 狀態 |
+|--------|------|------|
+| ExecutionService 路由 | backtest/paper/live 模式切換 | ✅ |
+| EOD 對帳 | `reconcile()` + `auto_correct()` | ✅ |
+| 交易時段管理 | 盤前/盤中/零股/定盤 + 佇列 | ✅ |
+| 排程整合 | `src/scheduler/` daily rebalance job | 待實作 |
+| 績效記錄 | 每日 NAV + 持倉快照 → DB | 待實作 |
+| Paper Trading API | `/api/v1/execution/paper-trading/status` | ✅ |
+| 交割查詢整合 | `api.settlements()` → 交割金額/日期 | 待實作 |
+
+### E4: Shioaji 進階功能（新增）
+
+基於 SDK 完整文檔，以下功能對專案有直接價值：
+
+#### E4a: Shioaji 歷史數據源
+
+Shioaji 提供 2020-03-02 起的 1 分鐘 K 棒和逐筆 tick，可作為新的 `DataFeed` 實作。
+
+| 功能 | API | 價值 |
+|------|-----|------|
+| 歷史 K 棒 | `api.kbars(contract, start, end)` | 1 分鐘級回測 |
+| 歷史 Tick | `api.ticks(contract, date)` | 微觀結構研究 |
+| 即時快照 | `api.snapshots(contracts)` (max 500) | 批量定價 / Portfolio 估值 |
+| 連續期貨 | `api.Contracts.Futures.TXF.TXFR1` | 期貨回測無縫接續 |
+
+**實作**: `src/data/sources/shioaji_feed.py` 實作 `DataFeed` ABC。
+**優勢**: 比 Yahoo Finance 更低延遲，且為 broker 原生數據。
+
+#### E4b: 市場掃描器（Universe Filter）
+
+Shioaji Scanner 可動態篩選交易標的，整合至 Alpha Pipeline 的 universe filtering。
+
+```python
+# 漲幅排行 / 成交量排行 / 成交金額排行 / 振幅排行
+api.scanners(scanner_type=sj.constant.ScannerType.VolumeRank, count=50)
+```
+
+**實作**: `src/data/scanner.py` — 每日開盤前自動更新活躍股票清單。
+**整合點**: `AlphaStrategy` 的 universe 參數可從 scanner 動態產生。
+
+#### E4c: 額度與風控整合
+
+| API | 用途 | 整合點 |
+|-----|------|--------|
+| `api.trading_limits()` | 可用交易額度 / 融資融券額度 | 下單前預檢 |
+| `api.account_balance()` | 可用餘額 | RiskEngine 資金檢查 |
+| `api.settlements()` | T+N 交割金額/日期 | pending_settlements 同步 |
+| `api.credit_enquires()` | 融資融券餘額 | 信用交易監控 |
+| `api.punish()` / `api.notice()` | 處置股/注意股 | 自動排除風險標的 |
+
+#### E4d: 融資融券與當沖
+
+擴展 `Order` 模型支援 Shioaji 信用交易條件：
+
+| 條件 | Shioaji 常數 | 場景 |
+|------|-------------|------|
+| 現股 | `StockOrderCond.Cash` | 預設 |
+| 融資 | `StockOrderCond.MarginTrading` | 槓桿多頭 |
+| 融券 | `StockOrderCond.ShortSelling` | 空頭策略 |
+| 現股當沖 | `daytrade_short=True` | 日內交易 |
+
+**需求**: 擴展 `src/domain/models.py` 新增 `OrderCondition` 枚舉。
+
+#### E4e: 非阻塞下單
+
+Shioaji `timeout=0` 模式讓下單延遲從 ~136ms 降至 ~12ms（12x 加速），對批量 rebalance 至關重要。
+
+```python
+trade = api.place_order(contract, order, timeout=0)  # 立即返回
+# 結果由 set_order_callback 推送
+```
+
+**實作**: `SinopacBroker.submit_order()` 預設使用 `timeout=0` + callback。
+
+#### E4f: 觸價委託（Stop Orders）
+
+利用 tick callback 實現軟體層的 stop-loss / stop-profit：
+
+**實作**: `src/execution/stop_order.py` — 監聽 tick，觸發價位到達時自動下單。
+**整合點**: RiskEngine kill switch 可透過 stop order 即時平倉。
+
+### E5: 期貨/選擇權交易
+
+利用 Shioaji 完整的期貨選擇權 API：
+
+| 功能 | 說明 |
+|------|------|
+| 期貨下單 | `FuturesPriceType.LMT/MKT` + `FuturesOCType.Auto/Cover` |
+| 選擇權下單 | Call/Put + 買權/賣權 |
+| 組合單 | `ComboContract` + `ComboOrder` (價差/跨式/勒式) |
+| 期貨展期 | 連續合約 R1/R2 + 自動 roll |
+| 夜盤 | `market_type: "Night"` |
+
+**依賴**: InstrumentRegistry 已支援 `AssetClass.FUTURE / OPTION`。
+
+### E6: IB 美股對接（第二階段）
 
 | 市場 | 券商 | SDK | 狀態 |
 |------|------|-----|------|
-| 台股 | 永豐金 | Shioaji | 待實作 |
-| 美股 | Interactive Brokers | ib_insync | 待實作 |
+| 美股 | Interactive Brokers | ib_insync | 待實作（Shioaji 完成後） |
 
-**實作方式**: `src/execution/` 新增 `shioaji_broker.py` / `ib_broker.py`，實作 `Broker` ABC。
+`src/execution/ib_broker.py`: 實作 `IBBroker(BrokerAdapter)`。
 
-> 券商評估見 `docs/dev/BROKER_API_EVALUATION.md`
-
-### E2: 即時行情
-
-填補 WebSocket `market` 頻道，連接 Shioaji / IB 的即時行情 push。
-
-### E3: Paper Trading
-
-完整紙上交易循環：策略 → 權重 → 下單 → 模擬成交 → 持倉更新。使用 SimBroker 後端但透過 API 操作。
-
-### E4: 期貨展期模擬
-
-`src/execution/roll.py`: 自動偵測近月到期 → roll 到下月合約 → 展期成本納入績效。
-
-### E5: 績效歸因
+### E7: 擴展績效歸因
 
 擴展 `src/alpha/attribution.py`: 資產配置歸因 + 選股歸因 + 匯率歸因。
 
 ### Phase E 完成標誌
 
-能在台股 + 美股上執行一次完整的 Paper Trading 循環：
-1. 策略產出權重 → 2. 券商 API 下單 → 3. 即時行情更新 → 4. 持倉同步 → 5. 績效報告
+能在台股上執行完整的 Paper Trading 循環：
+1. 策略產出權重 → 2. Shioaji 模擬下單 (timeout=0) → 3. 即時行情更新 → 4. 成交回報 callback → 5. 持倉同步 → 6. EOD 對帳 → 7. 交割查詢 → 8. 績效報告
 
 ---
 
@@ -90,6 +250,15 @@ InstrumentRegistry (自動推斷) + 多幣別 Portfolio (`nav_in_base`, `currenc
 | 2026-03-24 | Phase C (6 種最佳化+風險模型+幣別對沖) |
 | 2026-03-24 | 測試覆蓋補齊 (+29 tests: 期貨成本/golden value/E2E/FX) |
 | 2026-03-25 | Phase D (MultiAssetStrategy+跨資產風控+FX 修復+Allocation 前端) |
+| 2026-03-25 | Alpha 層強化 (5 新因子+Rolling IC+Regime+Attribution) |
+| 2026-03-25 | E1: SinopacBroker 核心 + ExecutionService + 對帳 + 83 tests |
+| TBD | E2: 即時行情 WS broadcast 整合 (需 API key) |
+| TBD | E3: Paper Trading 完整循環 + 排程 + 交割 |
+| TBD | E4a: Shioaji 歷史數據源 (kbars/ticks/snapshot) |
+| TBD | E4b: Scanner 動態 universe + 處置股排除 |
+| TBD | E4c-f: 額度預檢 + 融資融券 + 非阻塞 + 觸價 |
+| TBD | E5: 期貨選擇權交易 + 組合單 |
+| TBD | E6: IB 美股對接 |
 
 ---
 
@@ -100,4 +269,10 @@ InstrumentRegistry (自動推斷) + 多幣別 Portfolio (`nav_in_base`, `currenc
 | D-01~D-07 | ✅ | Phase A 管線整合 |
 | D-08 | 延後 | Alpha Pipeline GIL 限制 |
 | D-10~D-18 | ✅ | 模型統一/bug fixes/FX/權重/風控/整合 |
-| D-19 | Phase E | 期貨展期模擬 |
+| D-19 | Phase E5 | 期貨展期模擬 |
+| D-20 | ✅ E1 | SinopacBroker + ExecutionService + 對帳 + 交易時段 + API |
+| D-21 | E3 | Paper Trading 排程 + 交割查詢 |
+| D-22 | E4a | Shioaji DataFeed 實作 (kbars/ticks/snapshot) |
+| D-23 | E4b | Scanner 動態 universe + 處置/注意股排除 |
+| D-24 | E4d | 融資融券/當沖 Order 擴展 |
+| D-25 | E5 | 期貨選擇權交易 + 組合單 |

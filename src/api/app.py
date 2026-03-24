@@ -17,7 +17,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from src.api.auth import verify_ws_token
 from src.api.middleware import AuditMiddleware
-from src.api.routes import admin, allocation, alpha, auth, backtest, orders, portfolio, risk, strategies, system
+from src.api.routes import admin, allocation, alpha, auth, backtest, execution, orders, portfolio, risk, scanner, strategies, system
 from src.api.ws import ws_manager
 from src.config import get_config
 from src.logging_config import setup_logging
@@ -97,6 +97,8 @@ def create_app() -> FastAPI:
     app.include_router(backtest.router, prefix="/api/v1")
     app.include_router(risk.router, prefix="/api/v1")
     app.include_router(system.router, prefix="/api/v1")
+    app.include_router(execution.router, prefix="/api/v1")
+    app.include_router(scanner.router, prefix="/api/v1")
 
     # WebSocket 端點（需要 token 認證）
     @app.websocket("/ws/{channel}")
@@ -149,6 +151,20 @@ def create_app() -> FastAPI:
         }
         _seed_admin(config)
 
+        # 初始化 ExecutionService（根據 config.mode）
+        from src.execution.execution_service import ExecutionConfig, ExecutionService as ExecSvc
+
+        exec_config = ExecutionConfig(
+            mode=config.mode,
+            sinopac_api_key=config.sinopac_api_key,
+            sinopac_secret_key=config.sinopac_secret_key,
+            sinopac_ca_path=config.sinopac_ca_path,
+            sinopac_ca_password=config.sinopac_ca_password,
+        )
+        state.execution_service = ExecSvc(exec_config)
+        state.execution_service.initialize()
+        logger.info("ExecutionService initialized: mode=%s", config.mode)
+
         # 背景 Kill Switch 監控（每 5 秒檢查一次）
         async def _kill_switch_monitor() -> None:
             while True:
@@ -181,6 +197,9 @@ def create_app() -> FastAPI:
             app.state.scheduler.stop()
         if hasattr(app.state, "kill_switch_task"):
             app.state.kill_switch_task.cancel()
+        from src.api.state import get_app_state as _get_state
+
+        _get_state().execution_service.shutdown()
         await ws_manager.close_all()
 
     return app

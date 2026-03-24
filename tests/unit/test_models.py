@@ -6,10 +6,12 @@ from decimal import Decimal
 from src.domain.models import (
     Instrument,
     Order,
+    OrderCondition,
     OrderStatus,
     Portfolio,
     Position,
     RiskDecision,
+    StockOrderLot,
 )
 
 
@@ -124,6 +126,33 @@ class TestOrder:
     def test_cancelled_is_terminal(self):
         order = Order(status=OrderStatus.CANCELLED)
         assert order.is_terminal is True
+
+    def test_default_order_cond_is_cash(self):
+        order = Order()
+        assert order.order_cond == OrderCondition.CASH
+
+    def test_default_order_lot_is_common(self):
+        order = Order()
+        assert order.order_lot == StockOrderLot.COMMON
+
+    def test_margin_trading_order(self):
+        order = Order(order_cond=OrderCondition.MARGIN_TRADING)
+        assert order.order_cond == OrderCondition.MARGIN_TRADING
+        # other defaults still hold
+        assert order.order_lot == StockOrderLot.COMMON
+
+    def test_odd_lot_order(self):
+        order = Order(order_lot=StockOrderLot.INTRADAY_ODD)
+        assert order.order_lot == StockOrderLot.INTRADAY_ODD
+        assert order.order_cond == OrderCondition.CASH
+
+    def test_day_trade_with_odd_lot(self):
+        order = Order(
+            order_cond=OrderCondition.DAY_TRADE,
+            order_lot=StockOrderLot.FIXING,
+        )
+        assert order.order_cond == OrderCondition.DAY_TRADE
+        assert order.order_lot == StockOrderLot.FIXING
 
 
 class TestRiskDecision:

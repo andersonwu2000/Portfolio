@@ -59,6 +59,20 @@ class OrderType(Enum):
     LIMIT = "LIMIT"
 
 
+class OrderCondition(Enum):
+    CASH = "CASH"                     # 現股
+    MARGIN_TRADING = "MARGIN_TRADING"  # 融資
+    SHORT_SELLING = "SHORT_SELLING"   # 融券
+    DAY_TRADE = "DAY_TRADE"          # 現股當沖
+
+
+class StockOrderLot(Enum):
+    COMMON = "COMMON"                 # 整股
+    INTRADAY_ODD = "INTRADAY_ODD"    # 盤中零股
+    ODD = "ODD"                       # 盤後零股
+    FIXING = "FIXING"                 # 定盤
+
+
 class Severity(Enum):
     INFO = "INFO"
     WARNING = "WARNING"
@@ -145,6 +159,8 @@ class Order:
     strategy_id: str = ""
     client_order_id: str = ""
     reject_reason: str = ""
+    order_cond: OrderCondition = OrderCondition.CASH
+    order_lot: StockOrderLot = StockOrderLot.COMMON
 
     @property
     def is_terminal(self) -> bool:

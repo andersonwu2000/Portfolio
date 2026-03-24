@@ -62,6 +62,12 @@ class TradingConfig(BaseSettings):
     commission_rate: float = 0.001425       # 台灣券商手續費
     tax_rate: float = 0.003                 # 台灣證交稅 (賣出)
 
+    # ── 永豐 Shioaji 券商 ──
+    sinopac_api_key: str = ""
+    sinopac_secret_key: str = ""
+    sinopac_ca_path: str = ""
+    sinopac_ca_password: str = ""
+
     # ── API ──
     api_host: str = "0.0.0.0"
     api_port: int = 8000

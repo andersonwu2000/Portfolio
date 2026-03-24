@@ -14,7 +14,9 @@ from typing import Any
 
 from src.data.store import DataStore
 from src.domain.models import Portfolio
+from src.execution.execution_service import ExecutionService
 from src.execution.oms import OrderManager
+from src.execution.stop_order import StopOrderManager
 from src.risk.engine import RiskEngine
 
 
@@ -29,6 +31,8 @@ class AppState:
     portfolio: Portfolio = field(default_factory=lambda: Portfolio(cash=Decimal("10000000")))
     oms: OrderManager = field(default_factory=OrderManager)
     risk_engine: RiskEngine = field(default_factory=_make_risk_engine)
+    execution_service: ExecutionService = field(default_factory=ExecutionService)
+    stop_order_manager: StopOrderManager = field(default_factory=StopOrderManager)
     strategies: dict[str, dict[str, Any]] = field(default_factory=dict)
     backtest_tasks: dict[str, dict[str, Any]] = field(default_factory=dict)
     alpha_tasks: dict[str, dict[str, Any]] = field(default_factory=dict)
