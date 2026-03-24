@@ -6,13 +6,14 @@ settlement, rejected orders, and dividend integration.
 
 from __future__ import annotations
 
+import threading
 from decimal import Decimal
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from src.backtest.engine import BacktestConfig, BacktestEngine
+from src.backtest.engine import BacktestCancelled, BacktestConfig, BacktestEngine
 from src.data.feed import HistoricalFeed
 from src.strategy.base import Context, Strategy
 
@@ -692,3 +693,32 @@ class TestDividendIntegration:
         assert final_nav_div > final_nav_nodiv, (
             f"Dividend NAV ({final_nav_div}) should exceed non-dividend NAV ({final_nav_nodiv})"
         )
+
+
+class TestCancelEvent:
+    """Tests for cooperative cancellation via threading.Event."""
+
+    def test_cancel_event_stops_backtest(self):
+        """A pre-set cancel_event should raise BacktestCancelled immediately."""
+        engine = BacktestEngine()
+        feed = _make_feed(["AAPL"], start="2024-01-02", end="2024-03-29")
+        _patch_engine(engine, feed)
+        config = _base_config()
+        strategy = _FixedWeightStrategy({"AAPL": 0.5})
+
+        cancel = threading.Event()
+        cancel.set()  # 立刻觸發取消
+
+        with pytest.raises(BacktestCancelled):
+            engine.run(strategy, config, cancel_event=cancel)
+
+    def test_no_cancel_event_runs_normally(self):
+        """Without cancel_event, backtest runs to completion."""
+        engine = BacktestEngine()
+        feed = _make_feed(["AAPL"], start="2024-01-02", end="2024-03-29")
+        _patch_engine(engine, feed)
+        config = _base_config()
+        strategy = _FixedWeightStrategy({"AAPL": 0.5})
+
+        result = engine.run(strategy, config, cancel_event=None)
+        assert result.total_trades >= 0

@@ -11,11 +11,16 @@ from __future__ import annotations
 
 import bisect
 import logging
+import threading
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Callable, Literal
+
+
+class BacktestCancelled(Exception):
+    """Raised when a backtest is cancelled via cancel_event."""
 
 import numpy as np
 import pandas as pd
@@ -96,6 +101,7 @@ class BacktestEngine:
         strategy: Strategy,
         config: BacktestConfig,
         progress_callback: Callable[[int, int], None] | None = None,
+        cancel_event: threading.Event | None = None,
     ) -> BacktestResult:
         """執行回測。"""
         self._price_matrix = pd.DataFrame()
@@ -195,6 +201,16 @@ class BacktestEngine:
         kill_switch_month: int = -1
 
         for i, bar_date in enumerate(trading_dates):
+            # 合作式取消：每個 bar 檢查一次
+            if cancel_event is not None and cancel_event.is_set():
+                logger.warning(
+                    "BACKTEST CANCELLED [%s] at bar %d/%d (%s)",
+                    run_id, i, total_bars, bar_date.strftime("%Y-%m-%d"),
+                )
+                raise BacktestCancelled(
+                    f"Backtest cancelled at bar {i}/{total_bars}"
+                )
+
             date_str = bar_date.strftime("%Y-%m-%d")
             if date_str in suspect_dates:
                 logger.debug("Skipping suspect date %s", date_str)

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import itertools
 import logging
+import threading
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -18,7 +19,7 @@ import numpy as np
 import pandas as pd
 
 from src.backtest.analytics import BacktestResult
-from src.backtest.engine import BacktestConfig, BacktestEngine
+from src.backtest.engine import BacktestCancelled, BacktestConfig, BacktestEngine
 from src.strategy.registry import resolve_strategy
 
 logger = logging.getLogger(__name__)
@@ -75,6 +76,7 @@ class WalkForwardAnalyzer:
         end: str,
         config: WFAConfig,
         param_grid: dict[str, list[Any]] | None = None,
+        cancel_event: threading.Event | None = None,
     ) -> WFAResult:
         """執行 Walk-Forward Analysis。
 
@@ -114,6 +116,12 @@ class WalkForwardAnalyzer:
         all_best_params: list[dict[str, Any] | None] = []
 
         for i, (train_start, train_end, test_start, test_end) in enumerate(folds_dates):
+            # 合作式取消：每個 fold 開始前檢查
+            if cancel_event is not None and cancel_event.is_set():
+                raise BacktestCancelled(
+                    f"Walk-forward cancelled at fold {i}/{len(folds_dates)}"
+                )
+
             logger.info(
                 "WFA Fold %d: train=%s~%s, test=%s~%s",
                 i, train_start, train_end, test_start, test_end,
@@ -131,6 +139,7 @@ class WalkForwardAnalyzer:
                     end=train_end,
                     config=config,
                     param_grid=param_grid,
+                    cancel_event=cancel_event,
                 )
             else:
                 # Run training set with default params for train_sharpe
@@ -141,6 +150,7 @@ class WalkForwardAnalyzer:
                     end=train_end,
                     config=config,
                     params=None,
+                    cancel_event=cancel_event,
                 )
                 train_sharpe = train_result.sharpe
 
@@ -152,6 +162,7 @@ class WalkForwardAnalyzer:
                 end=test_end,
                 config=config,
                 params=best_params,
+                cancel_event=cancel_event,
             )
 
             fold = WFAFold(
@@ -242,6 +253,7 @@ class WalkForwardAnalyzer:
         end: str,
         config: WFAConfig,
         params: dict[str, Any] | None,
+        cancel_event: threading.Event | None = None,
     ) -> BacktestResult:
         """執行單次回測。"""
         strategy = resolve_strategy(strategy_name, params)
@@ -257,7 +269,7 @@ class WalkForwardAnalyzer:
             tax_rate=config.tax_rate,
         )
         engine = BacktestEngine()
-        return engine.run(strategy, bt_config)
+        return engine.run(strategy, bt_config, cancel_event=cancel_event)
 
     def _grid_search(
         self,
@@ -267,6 +279,7 @@ class WalkForwardAnalyzer:
         end: str,
         config: WFAConfig,
         param_grid: dict[str, list[Any]],
+        cancel_event: threading.Event | None = None,
     ) -> tuple[dict[str, Any], float]:
         """在參數網格上搜尋最佳 Sharpe。
 
@@ -290,6 +303,7 @@ class WalkForwardAnalyzer:
                     end=end,
                     config=config,
                     params=params,
+                    cancel_event=cancel_event,
                 )
                 if result.sharpe > best_sharpe:
                     best_sharpe = result.sharpe

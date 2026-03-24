@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 import time
 import uuid
 from typing import Any, cast, Literal
@@ -26,7 +27,7 @@ from src.api.schemas import (
     WalkForwardResultResponse,
 )
 from src.api.state import get_app_state
-from src.backtest.engine import BacktestConfig, BacktestEngine
+from src.backtest.engine import BacktestCancelled, BacktestConfig, BacktestEngine
 from src.backtest.walk_forward import WalkForwardAnalyzer, WFAConfig
 from src.data.store import DataStore
 from src.strategy.registry import resolve_strategy
@@ -61,6 +62,8 @@ async def submit_backtest(request: Request, req: BacktestRequest, api_key: str =
         "progress": None,
     }
 
+    cancel_event = threading.Event()
+
     def _run() -> None:
         try:
             strategy = resolve_strategy(req.strategy, req.params)
@@ -83,7 +86,7 @@ async def submit_backtest(request: Request, req: BacktestRequest, api_key: str =
 
             engine = BacktestEngine()
             start_time = time.monotonic()
-            result = engine.run(strategy, bt_config, progress_callback=progress_cb)
+            result = engine.run(strategy, bt_config, progress_callback=progress_cb, cancel_event=cancel_event)
             duration = time.monotonic() - start_time
             BACKTEST_DURATION.labels(strategy=req.strategy).observe(duration)
             with state.backtest_lock:
@@ -118,6 +121,13 @@ async def submit_backtest(request: Request, req: BacktestRequest, api_key: str =
                 )
             except Exception:
                 logger.debug("Failed to persist backtest result %s", task_id, exc_info=True)
+        except BacktestCancelled:
+            logger.info("Backtest %s cancelled by timeout", task_id)
+            with state.backtest_lock:
+                state.backtest_tasks[task_id]["status"] = "failed"
+                state.backtest_tasks[task_id]["error"] = (
+                    f"Backtest timed out after {config.backtest_timeout}s"
+                )
         except Exception as e:
             logger.exception("Backtest %s failed", task_id)
             with state.backtest_lock:
@@ -132,6 +142,8 @@ async def submit_backtest(request: Request, req: BacktestRequest, api_key: str =
                 timeout=config.backtest_timeout,
             )
         except asyncio.TimeoutError:
+            # 通知執行緒停止：設定 cancel_event，執行緒在下一個 bar 會檢查並退出
+            cancel_event.set()
             with state.backtest_lock:
                 state.backtest_tasks[task_id]["status"] = "failed"
                 state.backtest_tasks[task_id]["error"] = (
@@ -265,6 +277,7 @@ async def submit_walk_forward(
 ) -> WalkForwardResultResponse:
     """提交 Walk-Forward Analysis（同步執行於背景線程）。"""
     config = get_config()
+    wf_cancel_event = threading.Event()
 
     def _run() -> WalkForwardResultResponse:
         wfa_config = WFAConfig(
@@ -283,6 +296,7 @@ async def submit_walk_forward(
             end=req.end,
             config=wfa_config,
             param_grid=req.param_grid,
+            cancel_event=wf_cancel_event,
         )
 
         fold_responses = [
@@ -314,6 +328,8 @@ async def submit_walk_forward(
             timeout=config.backtest_timeout,
         )
     except asyncio.TimeoutError:
+        # 通知執行緒停止
+        wf_cancel_event.set()
         raise HTTPException(
             status_code=504,
             detail=f"Walk-forward analysis timed out after {config.backtest_timeout}s",

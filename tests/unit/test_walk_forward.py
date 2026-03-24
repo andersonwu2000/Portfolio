@@ -106,6 +106,7 @@ class TestWalkForwardAnalyzer:
             end: str,
             config: WFAConfig,
             params: dict[str, Any] | None,
+            cancel_event: Any = None,
         ) -> BacktestResult:
             nonlocal call_count
             call_count += 1
