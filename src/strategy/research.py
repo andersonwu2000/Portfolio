@@ -257,7 +257,6 @@ def compute_factor_values(
     if not dates:
         return pd.DataFrame()
 
-    dates_set = set(dates)
     window = max(min_bars * 2, 300)
 
     # 逐標的計算（外層迴圈是 symbol，內層用 searchsorted 快速定位）
@@ -275,7 +274,6 @@ def compute_factor_values(
 
         values: dict[pd.Timestamp, float] = {}
         # 使用 searchsorted 批量定位，避免逐日 boolean mask
-        idx_arr = idx.values
         for dt in sym_dates:
             pos = idx.searchsorted(dt, side="right")
             if pos < min_bars:
@@ -329,7 +327,6 @@ def compute_forward_returns(
     for sym in symbols:
         df = data[sym]
         close = df["close"]
-        idx = df.index
 
         if len(close) <= horizon:
             continue

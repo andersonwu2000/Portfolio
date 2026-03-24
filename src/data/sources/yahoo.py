@@ -90,18 +90,33 @@ class YahooFeed(DataFeed):
 
         logger.info("Downloading %s from Yahoo Finance (freq=%s)", symbol, freq)
 
-        try:
-            ticker = yf.Ticker(symbol)
-            # auto_adjust=True: close 已含除權除息調整，回測用調整後價格
-            df = ticker.history(
-                start=str(start) if start else "2015-01-01",
-                end=str(end) if end else None,
-                interval=interval,
-                auto_adjust=True,
-            )
-        except Exception as e:
-            logger.error("Failed to download %s: %s", symbol, e)
-            return pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
+        import time
+
+        max_retries = 3
+        df = pd.DataFrame()
+        for attempt in range(max_retries):
+            try:
+                # 全域速率限制：每次請求前等待，避免觸發 Yahoo 限流
+                time.sleep(0.5)
+                ticker = yf.Ticker(symbol)
+                # auto_adjust=True: close 已含除權除息調整，回測用調整後價格
+                df = ticker.history(
+                    start=str(start) if start else "2015-01-01",
+                    end=str(end) if end else None,
+                    interval=interval,
+                    auto_adjust=True,
+                )
+                if not df.empty:
+                    break
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    wait = 2 ** attempt  # 1s, 2s, 4s
+                    logger.warning("Download %s failed (attempt %d/%d), retrying in %ds: %s",
+                                   symbol, attempt + 1, max_retries, wait, e)
+                    time.sleep(wait)
+                else:
+                    logger.error("Failed to download %s after %d attempts: %s", symbol, max_retries, e)
+                    return pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
 
         if df.empty:
             logger.warning("No data returned for %s", symbol)

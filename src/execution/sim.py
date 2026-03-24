@@ -160,13 +160,23 @@ class SimBroker:
             else:
                 actual_slippage_bps = Decimal("0")
 
-            # 手續費
-            notional = fill_qty * fill_price
-            commission = notional * Decimal(str(self.config.commission_rate))
+            # 手續費 — 優先使用 instrument 的 per-instrument 費率（若存在）
+            multiplier = getattr(order.instrument, "multiplier", Decimal("1")) or Decimal("1")
+            notional = fill_qty * fill_price * multiplier
 
-            # 交易稅（賣出時）
+            inst_comm = getattr(order.instrument, "commission_rate", None)
+            if inst_comm is not None and Decimal(str(inst_comm)) > 0:
+                commission = notional * Decimal(str(inst_comm))
+            else:
+                commission = notional * Decimal(str(self.config.commission_rate))
+
+            # 交易稅（賣出時）— 優先使用 instrument 的稅率（若存在）
             if order.side == Side.SELL:
-                commission += notional * Decimal(str(self.config.tax_rate))
+                inst_tax = getattr(order.instrument, "tax_rate", None)
+                if inst_tax is not None and Decimal(str(inst_tax)) > 0:
+                    commission += notional * Decimal(str(inst_tax))
+                else:
+                    commission += notional * Decimal(str(self.config.tax_rate))
 
             # 更新訂單狀態
             order.status = OrderStatus.FILLED

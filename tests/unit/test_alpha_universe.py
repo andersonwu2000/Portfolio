@@ -1,7 +1,6 @@
 """Tests for src/alpha/universe.py — 股票池篩選。"""
 
 import pandas as pd
-import pytest
 
 from src.alpha.universe import UniverseConfig, UniverseFilter
 

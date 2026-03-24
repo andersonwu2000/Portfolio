@@ -92,11 +92,14 @@ def weights_to_orders(
             continue
 
         # 計算需要交易的數量
+        inst = (instruments or {}).get(symbol, Instrument(symbol=symbol))
+        multiplier = inst.multiplier if inst.multiplier > 0 else Decimal("1")
         target_value = Decimal(str(diff_w)) * nav
-        qty = abs(target_value / price)
+        # 考慮合約乘數：每口合約的名義價值 = price × multiplier
+        notional_per_unit = price * multiplier
+        qty = abs(target_value / notional_per_unit)
 
         # 取整到 lot_size（市場感知）
-        inst = (instruments or {}).get(symbol, Instrument(symbol=symbol))
         lot_size = _get_lot_size(symbol, inst, market_lot_sizes, fractional_shares)
         if lot_size > 0:
             qty = (qty // Decimal(str(lot_size))) * Decimal(str(lot_size))
@@ -109,7 +112,7 @@ def weights_to_orders(
         # Cap buy orders to available cash when settlement constraint is active
         if side == Side.BUY and available_cash is not None:
             max_buy_value = max(available_cash, Decimal("0"))
-            max_buy_qty = max_buy_value / price if price > 0 else Decimal("0")
+            max_buy_qty = max_buy_value / notional_per_unit if notional_per_unit > 0 else Decimal("0")
             if lot_size > 0:
                 max_buy_qty = (max_buy_qty // Decimal(str(lot_size))) * Decimal(str(lot_size))
             if qty > max_buy_qty:
@@ -117,7 +120,7 @@ def weights_to_orders(
             if qty <= 0:
                 continue
             # Reduce remaining available cash for subsequent buy orders
-            available_cash -= qty * price
+            available_cash -= qty * notional_per_unit
 
         order = Order(
             id=uuid.uuid4().hex[:12],

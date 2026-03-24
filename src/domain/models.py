@@ -27,6 +27,7 @@ class AssetClass(Enum):
     EQUITY = "EQUITY"
     FUTURE = "FUTURE"
     OPTION = "OPTION"
+    ETF = "ETF"
 
 
 class OrderStatus(Enum):
@@ -153,8 +154,34 @@ class Portfolio:
 
     @property
     def nav(self) -> Decimal:
+        """NAV（單幣別模式，向後相容）。混幣別時使用 nav_in_base()。"""
         mv = sum(p.market_value for p in self.positions.values())
         return self.cash + mv
+
+    def nav_in_base(self, fx_rates: dict[tuple[str, str], Decimal] | None = None) -> Decimal:
+        """
+        以 base_currency 計價的 NAV。
+
+        各持倉根據 instrument.currency 轉換。無 fx_rates 或單幣別時回退到 self.nav。
+        """
+        if not fx_rates:
+            return self.nav
+
+        base = self.base_currency
+        total = self.total_cash(fx_rates)
+
+        for pos in self.positions.values():
+            cur = getattr(pos.instrument, "currency", base)
+            if isinstance(cur, str):
+                pos_cur = cur
+            else:
+                pos_cur = str(cur)
+            mv = pos.market_value
+            if pos_cur != base and (pos_cur, base) in fx_rates:
+                mv = mv * fx_rates[(pos_cur, base)]
+            total += mv
+
+        return total
 
     @property
     def gross_exposure(self) -> Decimal:
@@ -180,6 +207,57 @@ class Portfolio:
         if symbol not in self.positions or self.nav == 0:
             return Decimal("0")
         return self.positions[symbol].market_value / self.nav
+
+    # ── 多幣別擴展（向後相容） ──────────────────────────
+
+    # 多幣別現金帳戶：key=幣別字串 ("TWD", "USD"), value=金額
+    # 預設為空。若為空，則所有操作回退到使用 self.cash (單幣別)。
+    cash_by_currency: dict[str, Decimal] = field(default_factory=dict)
+    base_currency: str = "TWD"
+
+    def total_cash(self, fx_rates: dict[tuple[str, str], Decimal] | None = None) -> Decimal:
+        """以 base_currency 計算總現金。無多幣別帳戶時直接回傳 self.cash。"""
+        if not self.cash_by_currency:
+            return self.cash
+        total = Decimal("0")
+        for cur, amount in self.cash_by_currency.items():
+            if cur == self.base_currency:
+                total += amount
+            elif fx_rates and (cur, self.base_currency) in fx_rates:
+                total += amount * fx_rates[(cur, self.base_currency)]
+            else:
+                total += amount  # 無匯率時假設 1:1
+        return total
+
+    def currency_exposure(self) -> dict[str, Decimal]:
+        """各幣別的淨暴露（現金 + 持倉市值）。"""
+        exposure: dict[str, Decimal] = {}
+        # 現金
+        if self.cash_by_currency:
+            for cur, amount in self.cash_by_currency.items():
+                exposure[cur] = exposure.get(cur, Decimal("0")) + amount
+        else:
+            exposure[self.base_currency] = self.cash
+        # 持倉 — 使用 instrument.currency
+        for pos in self.positions.values():
+            cur = getattr(pos.instrument, "currency", self.base_currency)
+            if isinstance(cur, str):
+                pass
+            else:
+                cur = str(cur)
+            exposure[cur] = exposure.get(cur, Decimal("0")) + pos.market_value
+        return exposure
+
+    def asset_class_weights(self) -> dict[str, Decimal]:
+        """各資產類別佔 NAV 的權重。"""
+        nav_val = self.nav
+        if nav_val == 0:
+            return {}
+        weights: dict[str, Decimal] = {}
+        for pos in self.positions.values():
+            ac = pos.instrument.asset_class.value
+            weights[ac] = weights.get(ac, Decimal("0")) + abs(pos.market_value) / nav_val
+        return weights
 
     def update_market_prices(self, prices: dict[str, Decimal]) -> None:
         """用最新市價更新所有持倉。"""

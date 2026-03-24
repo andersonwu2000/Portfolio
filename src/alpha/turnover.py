@@ -102,7 +102,6 @@ def analyze_factor_turnover(
         factor_name: 因子名稱
     """
     dates = factor_values.index
-    q_label = f"Q{n_quantiles}"
 
     # 模擬最高分位的等權組合
     weight_rows: list[dict[str, float]] = []

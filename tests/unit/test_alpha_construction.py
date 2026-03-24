@@ -1,7 +1,6 @@
 """Tests for src/alpha/construction.py — 成本感知組合建構。"""
 
 import pandas as pd
-import pytest
 
 from src.alpha.construction import ConstructionConfig, blend_with_decay, construct_portfolio
 

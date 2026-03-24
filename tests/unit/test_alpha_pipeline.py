@@ -2,7 +2,6 @@
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from src.alpha.pipeline import AlphaConfig, AlphaPipeline, AlphaReport, FactorSpec
 from src.alpha.universe import UniverseConfig

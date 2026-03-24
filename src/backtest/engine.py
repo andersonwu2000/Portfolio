@@ -31,6 +31,7 @@ from src.execution.sim import SimBroker, SimConfig
 from src.risk.engine import RiskEngine
 from src.risk.rules import MarketState
 from src.strategy.base import Context, Strategy
+from src.instrument.registry import InstrumentRegistry
 from src.strategy.engine import weights_to_orders
 
 logger = logging.getLogger(__name__)
@@ -126,6 +127,28 @@ class BacktestEngine:
 
         # 預建價格/成交量矩陣
         self._build_matrices(feed, config.universe)
+
+        # 1b. 建構 Instrument Registry 並偵測多幣別
+        registry = InstrumentRegistry()
+        self._instruments: dict[str, Instrument] = {}
+        for sym in config.universe:
+            inst = registry.get_or_create(sym)
+            self._instruments[sym] = inst.to_legacy()  # type: ignore[assignment]
+
+        # 偵測是否為混幣別 universe
+        currencies = {getattr(self._instruments[s], "currency", "TWD") for s in self._instruments}
+        self._is_multi_currency = len(currencies) > 1
+        self._fx_rates: dict[tuple[str, str], Decimal] = {}
+
+        if self._is_multi_currency:
+            logger.info("Multi-currency universe detected: %s", currencies)
+            # 預載入 FX 時序（如 USD→TWD）
+            try:
+                fx_pair = feed.get_fx_rate("USD", "TWD")
+                if fx_pair and fx_pair != Decimal("1"):
+                    self._fx_rates[("USD", "TWD")] = fx_pair
+            except Exception:
+                logger.debug("FX rate load failed, using 1:1", exc_info=True)
 
         # 2. 準備元件
         sim_broker = SimBroker(SimConfig(
@@ -405,6 +428,7 @@ class BacktestEngine:
 
         orders = weights_to_orders(
             target_weights, portfolio, prices,
+            instruments=self._instruments,
             available_cash=avail_cash,
             market_lot_sizes=config.market_lot_sizes,
             fractional_shares=config.fractional_shares,

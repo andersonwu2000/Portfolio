@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class DataFeed(ABC):
-    """數據源統一介面。"""
+    """數據源統一介面 — 支援股票、ETF、期貨、匯率。"""
 
     @abstractmethod
     def get_bars(
@@ -42,6 +42,32 @@ class DataFeed(ABC):
     @abstractmethod
     def get_universe(self) -> list[str]:
         """取得可交易標的清單。"""
+
+    def get_fx_rate(
+        self,
+        base: str,
+        quote: str,
+        date: datetime | str | None = None,
+    ) -> Decimal:
+        """
+        取得匯率 (base/quote)。例如 get_fx_rate("USD", "TWD") 回傳 1 USD = ? TWD。
+        預設實作透過 get_bars 查詢 "{base}{quote}=X"。
+        """
+        pair = f"{base}{quote}=X"
+        try:
+            bars = self.get_bars(pair, start=date, end=date)
+            if not bars.empty:
+                return Decimal(str(bars["close"].iloc[-1]))
+        except Exception:
+            logger.debug("FX rate lookup failed for %s%s", base, quote, exc_info=True)
+        return Decimal("1")  # fallback
+
+    def get_futures_chain(self, root_symbol: str) -> list[str]:
+        """
+        取得期貨合約鏈（近月到遠月的 symbol 列表）。
+        預設回傳空列表，子類別可覆寫。
+        """
+        return []
 
 
 class HistoricalFeed(DataFeed):
