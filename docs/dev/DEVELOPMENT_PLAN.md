@@ -1,235 +1,154 @@
 # 開發計畫書
 
-> **版本**: v2.4
+> **版本**: v3.0
 > **日期**: 2026-03-24
 > **目標**: 建立涵蓋多個可自動交易市場的投資組合研究與優化系統
 > **可交易市場**: 台股、美股、ETF（含債券/商品 ETF 代理）、台灣期貨、美國期貨
 > **不納入**: 直接債券交易（OTC）、實體商品、零售外匯（台灣法規限制）
 > **架構設計**: `docs/dev/MULTI_ASSET_ARCHITECTURE.md`
-> **已完成**: 股票交易系統 + Alpha 研究層 + Phase A + Phase B + Phase C
+> **已完成**: Phase A（基礎設施）+ Phase B（跨資產 Alpha）+ Phase C（組合最佳化）
 
 ---
 
 ## 目錄
 
-1. [開發策略](#1-開發策略)
-2. [Phase A：多資產基礎設施 + 管線整合](#2-phase-a多資產基礎設施--管線整合)
-3. [Phase B：跨資產 Alpha](#3-phase-b跨資產-alpha)
-4. [Phase C：多資產組合最佳化](#4-phase-c多資產組合最佳化)
-5. [Phase D：回測與風控升級](#5-phase-d回測與風控升級)
-6. [Phase E：實盤](#6-phase-e實盤)
-7. [已完成的里程碑](#7-已完成的里程碑)
-8. [設計缺陷追蹤](#8-設計缺陷追蹤)
+1. [階段概覽](#1-階段概覽)
+2. [Phase A~C：已完成](#2-phase-ac已完成)
+3. [Phase D：系統整合 + 風控升級（當前）](#3-phase-d系統整合--風控升級當前)
+4. [Phase E：實盤交易](#4-phase-e實盤交易)
+5. [已完成的里程碑](#5-已完成的里程碑)
+6. [設計缺陷追蹤](#6-設計缺陷追蹤)
 
 ---
 
-## 1. 開發策略
-
-### 1.1 核心原則
-
-**基礎設施 → 管線整合 → Alpha → 最佳化 → 回測 → 實盤**
-
-Phase A 的教訓：建立新模組（Instrument、多幣別欄位）不等於完成。必須將新模組**整合進現有的執行管線**（回測引擎、SimBroker、weights_to_orders），否則新舊系統斷裂。
-
-### 1.2 階段概覽
+## 1. 階段概覽
 
 ```
-Phase A ✅                  Phase B ✅           Phase C ✅            Phase D (當前)      Phase E
-基礎設施 + 管線整合           跨資產 Alpha          組合最佳化            回測+風控           實盤
-───────────────────         ────────────         ─────────            ──────────         ──────
-✅ A1 Instrument Registry   ✅ B1 宏觀因子模型     ✅ C1 多資產最佳化器   期貨展期模擬        券商對接
-✅ A2 多幣別 Portfolio       ✅ B2 跨資產信號       ✅ C2 幣別對沖         跨資產風控規則      Paper/Live
-✅ A3 擴展 DataFeed         ✅ B3 戰術配置引擎      ✅ C3 風險模型         績效歸因           多資產前端
-✅ A4 FRED 數據源           ✅ API + 前端型別       ✅ C4 兩層整合（設計）
-✅ A5 管線整合 (D-01~D-06)
-✅ A6 YahooFeed 韌性強化
-✅ 模型統一 + 死碼清理
-✅ Code Review + mypy 修復
+Phase A ✅               Phase B ✅          Phase C ✅           Phase D (當前)       Phase E
+基礎設施+管線整合         跨資產 Alpha         組合最佳化            系統整合+風控         實盤
+─────────────────       ────────────        ─────────           ─────────           ──────
+✅ Instrument Registry  ✅ 宏觀因子模型       ✅ 6 種最佳化器       兩層配置整合          券商對接
+✅ 多幣別 Portfolio      ✅ 跨資產信號        ✅ 風險模型(LW)       跨資產風控規則         Paper/Live
+✅ DataFeed 擴展        ✅ 戰術配置引擎       ✅ 幣別對沖           期貨展期模擬          多資產前端
+✅ FRED + 管線整合      ✅ API + 前端型別                          績效歸因
+✅ FX 時序修復                                                    Allocation 整合
 ```
 
-### 1.3 現有基礎
+### 核心原則
 
-| 能力 | 狀態 | 位置 |
-|------|------|------|
-| 股票回測引擎 | ✅ | `src/backtest/` |
-| Alpha 研究層 (11 模組) | ✅ | `src/alpha/` |
-| Instrument Registry | ✅ 已整合 | `src/instrument/` |
-| 多幣別 Portfolio | ✅ 已整合 | `src/domain/models.py` |
-| FRED 數據源 | ✅ | `src/data/sources/fred.py` |
-| DataFeed 擴展 (FX/期貨) | ✅ | `src/data/feed.py` |
-| mypy strict 通過 | ✅ 83 files, 0 errors | CI `backend-lint` |
-| 測試套件 | ✅ 475 passed, 2 skipped | CI `backend-test` |
+Phase A~C 的教訓：**模組存在 ≠ 系統整合**。目前 `src/allocation/` 和 `src/portfolio/` 都是獨立模組，尚未接入回測引擎的主迴圈。Phase D 的首要任務是打通兩層配置流程，使系統能做到「輸入 universe → 自動配置 → 回測」。
 
 ---
 
-## 2. Phase A：多資產基礎設施 + 管線整合
+## 2. Phase A~C：已完成
 
-### ✅ 全部完成
+### Phase A：多資產基礎設施 + 管線整合 ✅
 
-- ✅ **A1**: Instrument Registry (`src/instrument/`)
-- ✅ **A2**: 多幣別 Portfolio (`cash_by_currency`, `total_cash()`, `currency_exposure()`, `nav_in_base()`)
-- ✅ **A3**: DataFeed 擴展 (`get_fx_rate()`, `get_futures_chain()`)
-- ✅ **A4**: FRED 宏觀數據源 (`src/data/sources/fred.py`)
-- ✅ **A5a**: `weights_to_orders()` 支援合約乘數 (`qty = target_value / (price × multiplier)`)
-- ✅ **A5b**: SimBroker per-instrument 費率（commission_rate / tax_rate 覆蓋 SimConfig）
-- ✅ **A5c**: `Portfolio.nav_in_base(fx_rates)` 多幣別 NAV
-- ✅ **A5d**: BacktestEngine `_snap_nav()` 改用 `nav_in_base()` 計算 NAV
-- ✅ **A5e**: InstrumentRegistry 接入 BacktestEngine（`get_or_create()` 建構 instruments dict）
-- ✅ **A6**: YahooFeed 指數退避重試 + 速率限制
-- ✅ **模型統一**: 雙重 Instrument 定義合併至 `src/domain/models.py`，`src/instrument/model.py` 改為 re-export
-- ✅ **死碼清理**: `combine_factors()`, `revenue_momentum()`, `TestCombineFactors` 移除（-199 LOC）
-- ✅ **mypy 修復**: 14 個 strict 錯誤全部修復（orthogonalize, cross_section, construction, research, fred, yahoo, alpha routes）
-- ✅ **Code Review 修復**: `registry.py` 移除錯誤的 `expiry=None` kwarg；`_snap_nav` 正確呼叫 `nav_in_base()`
+- Instrument Registry (自動推斷 symbol → asset_class/market/currency/multiplier)
+- 多幣別 Portfolio (`nav_in_base()`, `currency_exposure()`, `cash_by_currency`)
+- DataFeed 擴展 (FX time series, futures chain)
+- FRED 宏觀數據源 (7+ series, parquet cache)
+- 管線整合 (weights_to_orders 乘數, SimBroker per-instrument 費率, 回測 FX per-bar)
+- 模型統一 + 死碼清理 + mypy strict 0 errors
 
-### Phase A 完成標誌（已達成）
+### Phase B：跨資產 Alpha ✅
 
-能正確回測一個混合 universe（如 `["2330.TW", "AAPL", "TLT", "GC=F"]`），其中：
-- 期貨數量正確反映合約乘數
-- NAV 以 base_currency (TWD) 計價，含匯率轉換
-- 各標的使用各自的手續費/稅率
-- InstrumentRegistry 自動推斷標的屬性
+- `src/allocation/macro_factors.py`：成長/通膨/利率/信用 四因子 z-score
+- `src/allocation/cross_asset.py`：動量/波動率/均值回歸 per AssetClass
+- `src/allocation/tactical.py`：TacticalEngine (戰略 + 宏觀 + 跨資產 + regime → 資產類別權重)
+- `POST /api/v1/allocation` API + 前端 TacticalRequest/Response 型別
+
+### Phase C：多資產組合最佳化 ✅
+
+- `src/portfolio/optimizer.py`：6 種方法 (EW/IV/RP/MVO/BL/HRP) + OptimizationResult
+- `src/portfolio/risk_model.py`：Ledoit-Wolf 收縮共變異數 + 風險貢獻分解
+- `src/portfolio/currency.py`：CurrencyHedger 分級對沖策略
 
 ---
 
-## 3. Phase B：跨資產 Alpha ✅
+## 3. Phase D：系統整合 + 風控升級（當前）
 
-**目標**: 回答「現在應該把多少比例放在股票、債券ETF、商品、現金？」
+**目標**: 打通兩層配置流程，讓 allocation + optimizer 能參與回測和執行。
 
-**輸入/輸出契約**：
-```
-macro_signals: dict[str, float]          ← 宏觀指標（前向填補至每日）
-cross_asset_signals: dict[str, float]    ← 跨資產動量/carry/value
-strategic_weights: dict[AssetClass, float]  ← 靜態目標（YAML 設定）
-         ↓
-tactical_weights: dict[AssetClass, float]   ← 戰術偏離後的資產類別比例
-```
+### Task D1: 兩層配置整合
 
-### ✅ Task B1: 宏觀因子模型
+**核心問題**: `src/allocation/` 和 `src/portfolio/` 目前與 BacktestEngine 完全斷開。
 
-`src/allocation/macro_factors.py` — MacroFactorModel + MacroSignals
+**方案**: 建立 `MultiAssetStrategy` — 一個新的 Strategy 子類，內部串接兩層：
 
-| 因子 | 指標 | 信號 |
-|------|------|------|
-| 成長 | GDP, PMI, 就業 | 加速 → 股票+、債券ETF− |
-| 通膨 | CPI, PPI, 油價 | 上升 → 商品ETF+、長債ETF− |
-| 利率 | 央行利率, 殖利率斜率 | 下降 → 長債ETF+、成長股+ |
-| 信用 | 信用利差, 違約率 | 收窄 → HYG+、股票+ |
+```python
+class MultiAssetStrategy(Strategy):
+    """兩層配置策略：資產類別配置 → 資產內選股 → 組合最佳化。"""
 
-> **頻率問題**：CPI/GDP/PMI 為月度/季度，統一以最新發布值**前向填補**（上限 66 個交易日）。宏觀信號再計算頻率建議設為月度（`rebalance_freq="monthly"`）。
+    def on_bar(self, ctx: Context) -> dict[str, float]:
+        # 1. 戰術配置 → dict[AssetClass, float]
+        tactical_weights = self.tactical_engine.compute(macro, cross_asset, regime)
 
-### ✅ Task B2: 跨資產信號
+        # 2. 各資產類別內選標的 → dict[str, float]
+        symbol_weights = {}
+        for asset_class, class_weight in tactical_weights.items():
+            class_universe = [s for s in universe if instruments[s].asset_class == asset_class]
+            alpha_weights = self.alpha_pipeline.generate_weights(data, current_date)
+            for sym, w in alpha_weights.items():
+                symbol_weights[sym] = w * class_weight
 
-`src/allocation/cross_asset.py` — CrossAssetSignals
-
-| 因子 | 定義 | 適用 |
-|------|------|------|
-| 時間序列動量 | 12M 報酬 (12-1) | 所有資產 |
-| Carry | 股息率 / 期貨展期收益 | 股票 / 期貨 |
-| Value | 長期均值回歸 (CAPE) | 股票 / 債券ETF |
-| Volatility | 已實現 vs 隱含波動率 | 所有 |
-
-> **市場狀態識別 (regime)**：直接使用現有 `src/alpha/regime.py`，不在 `allocation/` 另建重複模組。
-
-### ✅ Task B3: 戰術配置引擎
-
-`src/allocation/tactical.py` — TacticalEngine + StrategicAllocation + TacticalConfig
-
-結合戰略配置 + 宏觀信號 + 跨資產信號 + regime → 輸出 `dict[AssetClass, float]`（資產類別戰術權重）。
-
-### ✅ Task B4: API + 前端型別
-
-- `src/api/routes/allocation.py` — `POST /api/v1/allocation` 端點
-- `apps/shared/src/types/` — TacticalRequest, TacticalResponse 型別
-- `apps/shared/src/api/endpoints.ts` — allocation.compute() 端點
-
-### Phase B 完成標誌（已達成）
-
-能產出資產類別的戰術配置權重，宏觀因子、跨資產信號、市場狀態三類信號均有效影響配置。23 個單元測試全部通過。
-
----
-
-## 4. Phase C：多資產組合最佳化 ✅
-
-**輸入/輸出契約**：
-```
-tactical_weights: dict[AssetClass, float]   ← Phase B 輸出
-symbol_weights_per_class: dict[str, float]  ← Alpha Pipeline 輸出（資產內選擇）
-covariance_matrix, fx_rates, constraints    ← 市場數據 + 約束
-         ↓
-final_weights: dict[str, float]             ← 送進 weights_to_orders()
+        # 3. 組合最佳化
+        returns_df = self._build_returns(data, symbol_weights.keys())
+        result = self.optimizer.optimize(returns_df)
+        return result.weights
 ```
 
-### ✅ Task C1: 多資產最佳化器 (`src/portfolio/optimizer.py`)
-
-6 種方法：Equal Weight, Inverse Vol, Risk Parity, Mean-Variance, Black-Litterman（含 views + BLView dataclass）, HRP
-
-- Ledoit-Wolf 收縮共變異數估計
-- 權重上下限約束
-- OptimizationResult 含組合報酬/風險/Sharpe/風險貢獻
-
-### ✅ Task C2: 幣別對沖 (`src/portfolio/currency.py`)
-
-CurrencyHedger：根據暴露比例分級（<10% 不沖 / 10~40% 半沖 / >40% 積極沖），輸出 HedgeRecommendation（含金額、比例、年化成本）。
-
-### ✅ Task C3: 跨資產風險模型 (`src/portfolio/risk_model.py`)
-
-RiskModel：歷史法 + 指數加權 + Ledoit-Wolf 收縮共變異數、相關矩陣、年化波動率、組合風險、邊際風險貢獻。
-
-### ✅ Task C4: 兩層配置整合（設計完成）
-
-```
-戰略配置（YAML）→ 戰術偏離（B3）→ 資產內選擇（Alpha）→ 組合最佳化（C1）→ 最終持倉
-```
-
-> **約束管理**：執行期「拒絕/批准」型約束（槓桿上限、保證金不足）擴展到 `src/risk/rules.py`；最佳化器軟約束（目標函數懲罰項）內嵌於 `optimizer.py`。不另建 `constraints.py`。
-
-### Phase C 完成標誌（已達成）
-
-- 6 種最佳化方法（含 BL views、HRP）
-- 幣別對沖決策引擎
-- 風險模型（共變異數 + Ledoit-Wolf + 風險貢獻）
-- 28 個單元測試全部通過
-- 兩層流程設計完成，待 Phase D 整合回測引擎
-
----
-
-## 5. Phase D：回測與風控升級
-
-### Task D1: 期貨展期模擬
-
-自動偵測近月到期，模擬 roll 到下期，展期成本納入績效。
+**位置**: `src/strategy/multi_asset.py`
+**整合**: 註冊至 strategy registry，可在回測和 API 中使用
 
 ### Task D2: 跨資產風控規則
 
 擴展 `src/risk/rules.py`：
 
 ```
-max_asset_class_weight()   — 資產類別上限
-max_currency_exposure()    — 單一幣別暴露上限
-max_leverage()             — 總槓桿上限（期貨保證金）
-stress_test_limit()        — 壓力測試情境最大虧損
+max_asset_class_weight(threshold)   — 單一資產類別上限（如期貨 ≤ 20%）
+max_currency_exposure(threshold)    — 單一幣別暴露上限
+max_gross_leverage(threshold)       — 總槓桿上限（期貨保證金計算）
 ```
 
-### Task D3: 三層績效歸因
+### Task D3: 期貨展期模擬
 
-資產配置歸因 + 選股歸因 + 匯率歸因。
+**新增**: `src/execution/roll.py`
+
+自動偵測近月到期，模擬 roll 到下月合約，展期成本 (roll cost) 納入績效。
+
+### Task D4: 三層績效歸因
+
+**新增**: 擴展 `src/alpha/attribution.py`
+
+資產配置歸因 + 選股歸因 + 匯率歸因。區分配置層 vs Alpha 層 vs FX 對報酬的貢獻。
+
+### Phase D 完成標誌
+
+能執行一次完整的多資產回測：
+1. 輸入混合 universe (TW 股 + US 股 + ETF + 期貨)
+2. 系統自動分配至各資產類別（戰術配置）
+3. 各類別內部選標的（Alpha pipeline）
+4. 組合最佳化（Risk Parity / BL）
+5. 風控規則通過後執行
+6. 績效報告含資產配置歸因 + 匯率影響
 
 ---
 
-## 6. Phase E：實盤
+## 4. Phase E：實盤交易
 
 | 任務 | 說明 |
 |------|------|
-| 券商對接 | 台股 (永豐 Shioaji) + 美股 (Interactive Brokers) |
-| 即時行情 | 填補 WebSocket `market` 頻道（目前 TODO） |
-| Paper Trading | 完整紙上交易循環 |
-| 多資產前端 | 配置儀表板、跨市場持倉、幣別暴露圖 |
+| E1 券商對接 | 台股 (永豐 Shioaji) + 美股 (Interactive Brokers) |
+| E2 即時行情 | 填補 WebSocket `market` 頻道 |
+| E3 Paper Trading | 完整紙上交易循環 |
+| E4 多資產前端 | 配置儀表板、跨市場持倉、幣別暴露圖、資產配置視覺化 |
 
 > 券商評估細節見 `docs/dev/BROKER_API_EVALUATION.md`。
 
 ---
 
-## 7. 已完成的里程碑
+## 5. 已完成的里程碑
 
 ### 股票交易系統 (2026-03-22 ~ 2026-03-23)
 
@@ -239,55 +158,53 @@ stress_test_limit()        — 壓力測試情境最大虧損
 
 11 模組 + API 端點 + 前端頁面。效能優化：`compute_factor_values()` 向量化（~7 min → ~30s）。
 
-### Phase A 完整完成 (2026-03-24)
+### Phase A 基礎設施 (2026-03-24)
 
-- Instrument Registry + 多幣別 Portfolio + DataFeed 擴展 + FRED 數據源
-- A5 管線整合（D-01~D-07 全修復）+ A6 YahooFeed 韌性
-- 模型統一（雙重 Instrument 合併）+ 死碼清理（-199 LOC）
-
-### 程式碼品質提升 (2026-03-24)
-
-- **mypy strict 0 errors**：修復 14 個型別錯誤，涵蓋 7 個檔案
-- **Code Review 修復**：
-  - `registry.py` 移除錯誤的 `expiry=None`（YAML 載入 TypeError）
-  - `_snap_nav()` 改用 `portfolio.nav_in_base(fx_rates)`（多幣別 NAV 正確）
-- **測試**：475 passed, 2 skipped（全套 pytest）
+Instrument Registry + 多幣別 Portfolio + DataFeed + FRED + 管線整合 (D-01~D-07) + 模型統一 + 死碼清理。
 
 ### Phase B 跨資產 Alpha (2026-03-24)
 
-- `src/allocation/macro_factors.py`：宏觀四因子模型（成長/通膨/利率/信用），FRED 數據 z-score
-- `src/allocation/cross_asset.py`：跨資產信號（動量/波動率/均值回歸），per AssetClass
-- `src/allocation/tactical.py`：戰術配置引擎，合成三類信號 → 資產類別權重
-- `src/api/routes/allocation.py`：`POST /api/v1/allocation` API 端點
-- 前端型別 + 端點定義（TacticalRequest/Response）
-- 23 個單元測試，mypy strict + ruff 0 errors
+宏觀因子模型 + 跨資產信號 + 戰術配置引擎 + API + 前端型別。23 tests。
 
-### Phase C 多資產組合最佳化 (2026-03-24)
+### Phase C 組合最佳化 (2026-03-24)
 
-- `src/portfolio/optimizer.py`：6 種最佳化方法（Equal Weight / Inverse Vol / Risk Parity / MVO / Black-Litterman / HRP）
-- `src/portfolio/risk_model.py`：共變異數矩陣（歷史法 + EWM + Ledoit-Wolf 收縮）、風險貢獻分解
-- `src/portfolio/currency.py`：幣別對沖引擎（分級對沖策略 + HedgeRecommendation）
-- 28 個單元測試，mypy strict + ruff 0 errors
+6 種最佳化方法 + Ledoit-Wolf 風險模型 + 幣別對沖。28 tests。
+
+### 測試覆蓋補齊 (2026-03-24)
+
++29 tests 補齊期貨成本、golden value、多資產 E2E、Alpha 整合、NaN 邊界、FX 整合。
+
+### 架構審計 + Bug 修復 (2026-03-24)
+
+- **FX per-bar 更新**: 載入 USDTWD=X 時序，_snap_nav 每 bar 查找對應匯率
+- **總權重驗證**: weights_to_orders 檢查 sum > 1.5 時警告+正規化
+- **FRED ffill 上限**: `.ffill()` → `.ffill(limit=66)`
 
 ---
 
-## 8. 設計缺陷追蹤
+## 6. 設計缺陷追蹤
 
 | 編號 | 嚴重度 | 狀態 | 問題 |
 |------|--------|------|------|
-| ~~D-01~~ | ~~致命~~ | ✅ A5a | weights_to_orders 支援合約乘數 |
-| ~~D-02~~ | ~~致命~~ | ✅ A5c | Portfolio.nav_in_base() 多幣別 |
-| ~~D-03~~ | ~~致命~~ | ✅ A5d | BacktestEngine 多幣別 + Registry |
-| ~~D-04~~ | ~~高~~ | ✅ A5b | SimBroker per-instrument 費率 |
-| ~~D-05~~ | ~~高~~ | ✅ Phase B | 戰術配置層已實作 (`src/allocation/`) |
-| ~~D-06~~ | ~~高~~ | ✅ A5e | Registry 整合 BacktestEngine |
-| ~~D-07~~ | ~~中~~ | ✅ A6 | YahooFeed 重試/限流 |
-| D-08 | 中 | 延後 | Alpha Pipeline GIL 限制（多執行緒瓶頸） |
-| ~~D-09~~ | ~~低~~ | ✅ | 前端標的列表已擴展至 230 支（US/TW/ETF） |
-| ~~D-10~~ | ~~高~~ | ✅ | 雙重 Instrument 模型已統一 |
-| ~~D-11~~ | ~~致命~~ | ✅ | registry.py `expiry=None` 非法 kwarg |
-| ~~D-12~~ | ~~高~~ | ✅ | `_snap_nav` 未使用 `nav_in_base()`，多幣別 NAV 算錯 |
-| ~~D-13~~ | ~~中~~ | ✅ | mypy strict 14 個型別錯誤 |
+| ~~D-01~~ | ~~致命~~ | ✅ | weights_to_orders 合約乘數 |
+| ~~D-02~~ | ~~致命~~ | ✅ | Portfolio.nav_in_base() 多幣別 |
+| ~~D-03~~ | ~~致命~~ | ✅ | BacktestEngine 多幣別 + Registry |
+| ~~D-04~~ | ~~高~~ | ✅ | SimBroker per-instrument 費率 |
+| ~~D-05~~ | ~~高~~ | ✅ Phase B | 戰術配置層已實作 |
+| ~~D-06~~ | ~~高~~ | ✅ | Registry 整合 BacktestEngine |
+| ~~D-07~~ | ~~中~~ | ✅ | YahooFeed 重試/限流 |
+| D-08 | 中 | 延後 | Alpha Pipeline GIL 限制 |
+| ~~D-09~~ | ~~低~~ | ✅ | 前端標的列表 230 支 |
+| ~~D-10~~ | ~~高~~ | ✅ | Instrument 模型統一 |
+| ~~D-11~~ | ~~致命~~ | ✅ | registry.py expiry kwarg |
+| ~~D-12~~ | ~~高~~ | ✅ | _snap_nav 用 nav_in_base |
+| ~~D-13~~ | ~~中~~ | ✅ | mypy 14 errors |
+| ~~D-14~~ | ~~致命~~ | ✅ | FX 匯率逐 bar 更新（原本只載入一次） |
+| ~~D-15~~ | ~~高~~ | ✅ | 總權重無驗證（策略可回傳 >100%） |
+| ~~D-16~~ | ~~中~~ | ✅ | FRED ffill 無上限（應 66 天） |
+| D-17 | **高** | Phase D | allocation/optimizer 未整合進 BacktestEngine |
+| D-18 | **中** | Phase D | 無跨資產風控規則（幣別/槓桿上限） |
+| D-19 | **低** | Phase D | 期貨展期未模擬 |
 
 ---
 

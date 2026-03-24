@@ -188,6 +188,102 @@ def price_circuit_breaker(threshold: float = 0.10) -> RiskRule:
     return RiskRule(f"price_circuit_breaker_{threshold}", check)
 
 
+# ─── 跨資產風控規則 ─────────────────────────────────────
+
+
+def max_asset_class_weight(threshold: float = 0.40) -> RiskRule:
+    """單一資產類別權重上限。
+
+    檢查下單後，同一 asset_class 的持倉是否超過 NAV 的 threshold。
+    """
+    def check(order: Order, portfolio: Portfolio, market: MarketState) -> RiskDecision:
+        if portfolio.nav <= 0:
+            return RiskDecision.APPROVE()
+
+        ac = order.instrument.asset_class.value
+        # 計算當前該資產類別的市值
+        class_mv = sum(
+            abs(pos.market_value)
+            for pos in portfolio.positions.values()
+            if pos.instrument.asset_class.value == ac
+        )
+        # 加上預估的本次交易
+        price = order.price or market.prices.get(order.instrument.symbol, Decimal("0"))
+        multiplier = order.instrument.multiplier or Decimal("1")
+        order_notional = order.quantity * price * multiplier
+        if order.side.value == "BUY":
+            projected = class_mv + order_notional
+        else:
+            projected = max(class_mv - order_notional, Decimal("0"))
+
+        weight = float(projected / portfolio.nav)
+        if weight > threshold:
+            return RiskDecision.REJECT(
+                f"資產類別 {ac} 權重 {weight:.1%} 超過上限 {threshold:.1%}"
+            )
+        return RiskDecision.APPROVE()
+
+    return RiskRule(f"max_asset_class_weight_{threshold}", check)
+
+
+def max_currency_exposure(threshold: float = 0.60) -> RiskRule:
+    """單一幣別暴露上限。
+
+    檢查下單後，同一 currency 的持倉是否超過 NAV 的 threshold。
+    """
+    def check(order: Order, portfolio: Portfolio, market: MarketState) -> RiskDecision:
+        if portfolio.nav <= 0:
+            return RiskDecision.APPROVE()
+
+        cur = order.instrument.currency
+        # 當前該幣別的市值
+        cur_mv = sum(
+            abs(pos.market_value)
+            for pos in portfolio.positions.values()
+            if getattr(pos.instrument, "currency", "") == cur
+        )
+        price = order.price or market.prices.get(order.instrument.symbol, Decimal("0"))
+        multiplier = order.instrument.multiplier or Decimal("1")
+        order_notional = order.quantity * price * multiplier
+        if order.side.value == "BUY":
+            projected = cur_mv + order_notional
+        else:
+            projected = max(cur_mv - order_notional, Decimal("0"))
+
+        weight = float(projected / portfolio.nav)
+        if weight > threshold:
+            return RiskDecision.REJECT(
+                f"幣別 {cur} 暴露 {weight:.1%} 超過上限 {threshold:.1%}"
+            )
+        return RiskDecision.APPROVE()
+
+    return RiskRule(f"max_currency_exposure_{threshold}", check)
+
+
+def max_gross_leverage(threshold: float = 1.5) -> RiskRule:
+    """總槓桿上限（gross exposure / NAV）。
+
+    主要防止期貨過度槓桿。
+    """
+    def check(order: Order, portfolio: Portfolio, market: MarketState) -> RiskDecision:
+        if portfolio.nav <= 0:
+            return RiskDecision.APPROVE()
+
+        current_gross = float(portfolio.gross_exposure / portfolio.nav)
+        price = order.price or market.prices.get(order.instrument.symbol, Decimal("0"))
+        multiplier = order.instrument.multiplier or Decimal("1")
+        order_notional = float(order.quantity * price * multiplier / portfolio.nav)
+
+        projected = current_gross + order_notional
+        if projected > threshold:
+            return RiskDecision.REJECT(
+                f"總槓桿 {projected:.2f}x 超過上限 {threshold:.1f}x"
+            )
+        return RiskDecision.APPROVE()
+
+    return RiskRule(f"max_gross_leverage_{threshold}", check)
+
+
 # ─── 預設規則集 ─────────────────────────────────────
 
 def default_rules() -> list[RiskRule]:

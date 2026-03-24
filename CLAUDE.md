@@ -190,17 +190,19 @@ Key design decisions:
 
 ## Strategies
 
-7 built-in strategies in `strategies/`:
+9 strategies (7 built-in + 2 pipeline):
 
 | Strategy | File | Logic |
 |----------|------|-------|
-| Momentum | `momentum.py` | Price trend-following |
-| MA Crossover | `ma_crossover.py` | Fast/slow MA crossover signals |
-| Mean Reversion | `mean_reversion.py` | Buy oversold, sell overbought |
-| RSI Oversold | `rsi_oversold.py` | Buy when RSI < 30 |
-| Multi-Factor | `multi_factor.py` | Momentum + value + quality, risk-parity weighted |
-| Pairs Trading | `pairs_trading.py` | Statistical arbitrage on correlated instruments |
-| Sector Rotation | `sector_rotation.py` | Rotate capital by relative momentum across sectors |
+| Momentum | `strategies/momentum.py` | Price trend-following |
+| MA Crossover | `strategies/ma_crossover.py` | Fast/slow MA crossover signals |
+| Mean Reversion | `strategies/mean_reversion.py` | Buy oversold, sell overbought |
+| RSI Oversold | `strategies/rsi_oversold.py` | Buy when RSI < 30 |
+| Multi-Factor | `strategies/multi_factor.py` | Momentum + value + quality, risk-parity weighted |
+| Pairs Trading | `strategies/pairs_trading.py` | Statistical arbitrage on correlated instruments |
+| Sector Rotation | `strategies/sector_rotation.py` | Rotate capital by relative momentum across sectors |
+| Alpha | `src/alpha/strategy.py` | Configurable factor pipeline with neutralization + cost-aware construction |
+| Multi-Asset | `src/strategy/multi_asset.py` | Two-layer: tactical allocation → within-class selection → portfolio optimization |
 
 ## Infrastructure
 

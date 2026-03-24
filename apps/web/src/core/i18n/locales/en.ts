@@ -91,6 +91,8 @@ export const en = {
       pairs_trading: "Pairs trading strategy. Computes Z-scores of price ratios for each stock pair and buys the relatively weaker side when Z-score exceeds threshold. A market-neutral strategy independent of market direction.",
       multi_factor: "Multi-factor strategy. Combines momentum, mean-reversion, and RSI into a composite scoring model. Each factor is normalized and weighted; top-scoring stocks are selected. Balances trend-following with contrarian signals.",
       sector_rotation: "Sector rotation strategy. Ranks stocks by 60-day short-term momentum and concentrates on the top N. Uses risk-parity allocation (inverse volatility weighting) to reduce concentration in high-volatility names.",
+      alpha: "Alpha research strategy. Uses configurable factor pipeline (momentum, mean-reversion, RSI, etc.) with cross-sectional neutralization, orthogonalization, and cost-aware portfolio construction.",
+      multi_asset: "Multi-asset allocation strategy. Two-layer approach: tactical asset class allocation (macro factors + cross-asset signals + regime) → within-class selection → portfolio optimization (Risk Parity / Black-Litterman).",
     },
   },
 

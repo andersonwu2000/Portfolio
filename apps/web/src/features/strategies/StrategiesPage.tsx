@@ -8,7 +8,7 @@ import type { StrategyInfo } from "@core/api";
 import { Play, Square } from "lucide-react";
 import { strategiesApi } from "./api";
 
-const STRATEGY_KEYS = ["momentum_12_1", "mean_reversion", "rsi_oversold", "ma_crossover", "pairs_trading", "multi_factor", "sector_rotation"] as const;
+const STRATEGY_KEYS = ["momentum_12_1", "mean_reversion", "rsi_oversold", "ma_crossover", "pairs_trading", "multi_factor", "sector_rotation", "alpha", "multi_asset"] as const;
 type StrategyDescKey = typeof STRATEGY_KEYS[number];
 
 function getStrategyDescKey(name: string): StrategyDescKey | null {
