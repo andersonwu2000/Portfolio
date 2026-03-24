@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { ListChecks, Check, X } from "lucide-react";
 import { useT } from "@core/i18n";
 import { STOCK_LIST, PRESETS, type StockEntry } from "../data/stocks";
@@ -117,10 +118,10 @@ export function UniversePicker({ value, onChange }: UniversePickerProps) {
       </div>
 
       {/* Fullscreen-ish modal */}
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 pt-16" onClick={() => { setOpen(false); setQuery(""); }}>
+      {open && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => { setOpen(false); setQuery(""); }}>
           <div
-            className="bg-white dark:bg-[#1e293b] rounded-t-xl sm:rounded-xl shadow-2xl w-full max-w-2xl sm:mx-4 max-h-[80vh] sm:max-h-[75vh] flex flex-col sm:mt-8"
+            className="bg-white dark:bg-[#1e293b] rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -258,7 +259,8 @@ export function UniversePicker({ value, onChange }: UniversePickerProps) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </label>
   );
