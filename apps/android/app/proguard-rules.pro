@@ -23,3 +23,9 @@
 
 # Hilt
 -keep class dagger.hilt.** { *; }
+
+# Google Tink / EncryptedSharedPreferences (errorprone annotations)
+-dontwarn com.google.errorprone.annotations.**
+-dontwarn javax.annotation.**
+-dontwarn com.google.auto.value.**
+-dontwarn com.google.j2objc.annotations.**
