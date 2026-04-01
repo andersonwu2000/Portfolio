@@ -14,7 +14,7 @@
         → 獎勵 (Sharpe ratio)
 ```
 
-RL Agent 的輸出格式與 Portfolio System 的 `Strategy.on_bar()` 完全一致，可直接用同一套回測引擎和 Validator 評估。
+RL Agent 的輸出格式與 Quant System 的 `Strategy.on_bar()` 完全一致，可直接用同一套回測引擎和 Validator 評估。
 
 ## 實驗設計
 
