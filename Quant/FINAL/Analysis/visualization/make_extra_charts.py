@@ -5,7 +5,8 @@ Generates:
   signal/rolling_ic.png           — 12-month rolling IC (predictive power is stable)[§5.1]
   benchmark/startdate_sensitivity.png — strategy vs 0050 CAGR by start year        [§6.2]
   benchmark/alpha_significance.png    — alpha t-value rises as benchmark gets fairer[§6.3]
-  holdings/holdings_tradeoff.png  — CAGR/Sharpe/MDD vs holdings count              [concentration]
+  holdings_tradeoff.png           — CAGR/Sharpe/MDD vs holdings count              [concentration]
+  param_heatmaps.png              — 3-signal parameter heatmaps (not overfit)        [§5.3]
 
 CSV-derived charts read from results/. Two charts (alpha_significance, holdings)
 use deterministic values produced this session by analyze_fair_benchmark.py and
@@ -162,7 +163,7 @@ def holdings_tradeoff():
     ax.set_title("集中度取捨 (new_high, NET) — 越分散, Sharpe 越高、回撤越淺\n12/15 檔可用且勝被動, 但代價約 0.2 Sharpe + 10pp 回撤", fontweight="bold")
     l1, lab1 = ax.get_legend_handles_labels(); l2, lab2 = ax2.get_legend_handles_labels()
     ax.legend(l1 + l2, lab1 + lab2, fontsize=9, loc="center right")
-    save(fig, VIZ / "holdings" / "holdings_tradeoff.png")
+    save(fig, VIZ / "holdings_tradeoff.png")
 
 
 # ── Parameter heatmaps — not-overfit check across signals ─────────────────
@@ -194,7 +195,7 @@ def param_heatmaps():
     fig.suptitle("參數熱力圖 (Sharpe) — 三種訊號皆穩健, 選用配置(★)非孤立尖峰",
                  fontsize=14, fontweight="bold", y=1.02)
     fig.tight_layout()
-    save(fig, VIZ / "robustness" / "param_heatmaps.png")
+    save(fig, VIZ / "param_heatmaps.png")
 
 
 if __name__ == "__main__":

@@ -1,8 +1,8 @@
 """Per-factor charts from LOCAL results (no GitHub fetch).
 
 Reads each factor config's `results/_verify_<x>/` + `results/_robustness_<x>/` and
-writes charts under `visualization/<factor>/` (01_nav, 02_drawdown, 03_yearly),
-plus a cross-factor comparison under `visualization/_compare/`.
+writes per-config charts under `Report/figures/<factor>/` (01_nav, 02_drawdown,
+03_yearly), plus the cross-factor comparison `Report/figures/factor_comparison.png`.
 
 Run after: verify_strategy.py (per config) + analyze_robustness.py (per config).
 
@@ -202,10 +202,9 @@ def main():
         chart_yearly(d, label, out)
         print(f"OK {key}: 3 charts -> {out}")
     if len(loaded) >= 2:
-        cmp_out = VIZ / "_compare"
-        cmp_out.mkdir(parents=True, exist_ok=True)
-        chart_compare(loaded, cmp_out)
-        print(f"OK comparison -> {cmp_out}")
+        VIZ.mkdir(parents=True, exist_ok=True)
+        chart_compare(loaded, VIZ)
+        print(f"OK comparison -> {VIZ}")
 
 
 if __name__ == "__main__":
