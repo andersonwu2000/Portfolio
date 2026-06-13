@@ -1,0 +1,24 @@
+{
+  "grid": {
+    "max_holdings": [
+      30,
+      50,
+      70
+    ],
+    "min_yoy_growth": [
+      5.0,
+      10.0,
+      15.0
+    ]
+  },
+  "n_combos": 9,
+  "sharpe_min": 0.7071842791655997,
+  "sharpe_max": 0.8166049449834313,
+  "sharpe_mean": 0.7610256675344375,
+  "sharpe_std": 0.03803032486682143,
+  "cagr_min": 0.13171770736675859,
+  "cagr_max": 0.1959530802412104,
+  "cagr_mean": 0.16271820772978615,
+  "all_sharpe_positive": true,
+  "robustness_verdict": "robust"
+}

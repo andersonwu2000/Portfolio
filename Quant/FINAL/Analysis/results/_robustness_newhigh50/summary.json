@@ -1,0 +1,102 @@
+{
+  "strategy_overall": {
+    "n_years": 7.994524298425736,
+    "total_return": 2.9105261607140847,
+    "cagr": 0.18598748037862922,
+    "sharpe": 0.8743434864735459,
+    "volatility_annual": 0.21271672203880077
+  },
+  "yearly_walkforward": {
+    "years": [
+      {
+        "year": 2018,
+        "total_return": -0.24775638987534865,
+        "sharpe": -1.4515168168258066,
+        "max_drawdown": 0.2817722617620078,
+        "n_days": 247
+      },
+      {
+        "year": 2019,
+        "total_return": 0.3325969634750279,
+        "sharpe": 2.070569507151816,
+        "max_drawdown": 0.09504306262399422,
+        "n_days": 242
+      },
+      {
+        "year": 2020,
+        "total_return": 0.30522407000889196,
+        "sharpe": 1.1843931384695545,
+        "max_drawdown": 0.34839578245318803,
+        "n_days": 245
+      },
+      {
+        "year": 2021,
+        "total_return": 0.3906196151533232,
+        "sharpe": 1.4599478781597306,
+        "max_drawdown": 0.18766731466490733,
+        "n_days": 244
+      },
+      {
+        "year": 2022,
+        "total_return": 0.10183256020757936,
+        "sharpe": 0.5860399164689003,
+        "max_drawdown": 0.13751501599365057,
+        "n_days": 246
+      },
+      {
+        "year": 2023,
+        "total_return": 0.4076912698555586,
+        "sharpe": 2.4118820824804463,
+        "max_drawdown": 0.06627516409633905,
+        "n_days": 239
+      },
+      {
+        "year": 2024,
+        "total_return": 0.12610315173616504,
+        "sharpe": 0.7201015706974271,
+        "max_drawdown": 0.17945977271174693,
+        "n_days": 242
+      },
+      {
+        "year": 2025,
+        "total_return": 0.2472539605894135,
+        "sharpe": 1.0474984155925662,
+        "max_drawdown": 0.26449698666353894,
+        "n_days": 243
+      }
+    ],
+    "n_years_positive_sharpe": 7,
+    "n_years_total": 8,
+    "win_rate": 0.875
+  },
+  "deflated_sharpe": {
+    "observed_sharpe_annual": 0.8743434864735459,
+    "n_trials_assumed": 34,
+    "sr_max_expected": 0.7862644168680033,
+    "skew": -0.9606734666049275,
+    "excess_kurtosis": 6.317277892414552,
+    "z_score": 0.23799174612316895,
+    "dsr": 0.5940562520262131,
+    "interpretation": "marginal (>50%)"
+  },
+  "alpha_vs_random_p50_same_pool": {
+    "n_months": 95,
+    "alpha_monthly": 0.01276855663974725,
+    "alpha_annualised": 0.16445447022807347,
+    "alpha_t_stat": 4.271474832497343,
+    "alpha_significant_t2": true,
+    "beta": 1.041540514899613,
+    "r_squared": 0.7564561228794819,
+    "interpretation": "significant alpha after market exposure"
+  },
+  "alpha_vs_0050_market_index_aux": {
+    "n_months": 95,
+    "alpha_monthly": 0.007725339629229659,
+    "alpha_annualised": 0.09674623031493423,
+    "alpha_t_stat": 1.4251016325555894,
+    "alpha_significant_t2": false,
+    "beta": 0.5218737220987384,
+    "r_squared": 0.2558173666324375,
+    "interpretation": "marginal"
+  }
+}
