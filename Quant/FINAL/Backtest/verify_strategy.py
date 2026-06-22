@@ -35,15 +35,23 @@ from __future__ import annotations
 
 import argparse
 import json
-import logging
+import os
 import sys
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-logger = logging.getLogger(__name__)
+
+def _default_workers() -> int:
+    """min(16, cores-2) — leave headroom. Override with QUANT_WORKERS (e.g. =4 when
+    running several internally-parallel scripts at once, to avoid oversubscribing cores)."""
+    env = os.environ.get("QUANT_WORKERS")
+    if env and env.isdigit():
+        return max(1, int(env))
+    return max(1, min(16, (os.cpu_count() or 4) - 2))
+
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
@@ -94,7 +102,6 @@ def build_universe(data: ParquetDataSource, start: str, end: str
     price_syms = data.list_price_symbols()
     rev_syms = data.list_revenue_symbols()
     candidates = sorted(price_syms & rev_syms)
-    logger.info("Candidates (price + revenue): %d", len(candidates))
 
     start_ts = pd.Timestamp(start)
     end_ts = pd.Timestamp(end)
@@ -142,9 +149,6 @@ def build_universe(data: ParquetDataSource, start: str, end: str
     close_panel = close_panel.ffill(limit=10)
 
     n_alive = (close_panel.notna()).sum(axis=1)
-    logger.info("Universe (price + revenue): %d", len(universe))
-    logger.info("Alive count over time:  start=%d, mid=%d, end=%d",
-                int(n_alive.iloc[0]), int(n_alive.iloc[len(n_alive) // 2]), int(n_alive.iloc[-1]))
 
     return universe, close_panel, volume_panel, {s: revenue_data[s] for s in universe}, first_listed
 
@@ -240,10 +244,9 @@ class VerifyContext:
         df = self._feed.get_bars(symbol)
         if df.empty:
             return df
-        df = df[df.index <= self._current_time]
-        if len(df) > lookback:
-            df = df.iloc[-lookback:]
-        return df
+        # searchsorted + iloc instead of boolean indexing (rows [0:pos] have index <= current_time)
+        pos = int(df.index.searchsorted(self._current_time, side="right"))
+        return df.iloc[max(0, pos - lookback):pos]
 
     def universe(self):
         return self._feed.get_universe()
@@ -409,39 +412,110 @@ def buy_hold_etf(data: ParquetDataSource, symbol: str, daily_idx: pd.DatetimeInd
     return s / s.iloc[0] if len(s) else s
 
 
+# ── parallel random-portfolio worker (module-level so ProcessPoolExecutor can pickle it) ──
+_RP: dict = {}
+
+
+def _rp_init(panel, rebalance_dates, sim_idx, pool_cache, n_holdings, buy_bps, sell_bps, seed):
+    _RP.update(panel=panel, rb=rebalance_dates, sim_idx=sim_idx, pool=pool_cache,
+               n=n_holdings, buy=buy_bps, sell=sell_bps, seed=seed)
+
+
+def _rp_one(i):
+    rng = np.random.default_rng(_RP["seed"] + i)   # seed+i -> identical picks to the serial loop
+    n, pool_cache = _RP["n"], _RP["pool"]
+
+    def weight_fn(date, _cw, _nav):
+        pool = pool_cache.get(date, [])
+        if len(pool) < n:
+            return {}
+        picks = rng.choice(pool, size=n, replace=False)
+        return {s: 0.95 / n for s in picks}
+
+    nav, _ = simulate_nav(_RP["panel"], _RP["rb"], weight_fn,
+                          buy_cost_bps=_RP["buy"], sell_cost_bps=_RP["sell"], sim_idx=_RP["sim_idx"])
+    return nav.values
+
+
 def random_portfolios_nav(panel: pd.DataFrame, volume_panel: pd.DataFrame,
                           first_listed: dict[str, pd.Timestamp],
                           rebalance_dates: list[pd.Timestamp],
                           sim_idx: pd.DatetimeIndex,
                           n_samples: int = 1000, n_holdings: int = 15,
                           buy_bps: float = 17.0, sell_bps: float = 47.0,
-                          seed: int = 42) -> pd.DataFrame:
+                          seed: int = 42, n_workers: int | None = None) -> pd.DataFrame:
+    """1000 independent random-portfolio sims — parallelised across cores (identical
+    results: sample i always uses default_rng(seed+i)). ex.map preserves order."""
     pool_cache = {d: eligible_at(d, panel, volume_panel, first_listed) for d in rebalance_dates}
-    pool_sizes = [len(pool_cache[d]) for d in rebalance_dates]
-    logger.info("Random pool: min=%d, median=%d, max=%d",
-                min(pool_sizes), int(np.median(pool_sizes)), max(pool_sizes))
-
     nav_matrix = np.full((n_samples, len(sim_idx)), np.nan)
-    for i in range(n_samples):
-        rng_i = np.random.default_rng(seed + i)
-        def weight_fn(date, _cw, _nav, _rng=rng_i):
-            pool = pool_cache.get(date, [])
-            if len(pool) < n_holdings:
-                return {}
-            picks = _rng.choice(pool, size=n_holdings, replace=False)
-            w = 0.95 / n_holdings
-            return {s: w for s in picks}
-        nav, _ = simulate_nav(panel, rebalance_dates, weight_fn,
-                              buy_cost_bps=buy_bps, sell_cost_bps=sell_bps, sim_idx=sim_idx)
-        nav_matrix[i] = nav.values
-        if (i + 1) % 100 == 0:
-            logger.info("random: %d/%d", i + 1, n_samples)
+    n_workers = min(n_workers or _default_workers(), n_samples)
+    if n_workers <= 1:
+        _rp_init(panel, rebalance_dates, sim_idx, pool_cache, n_holdings, buy_bps, sell_bps, seed)
+        for i in range(n_samples):
+            nav_matrix[i] = _rp_one(i)
+    else:
+        with ProcessPoolExecutor(max_workers=n_workers, initializer=_rp_init,
+                                 initargs=(panel, rebalance_dates, sim_idx, pool_cache,
+                                           n_holdings, buy_bps, sell_bps, seed)) as ex:
+            for i, vals in enumerate(ex.map(_rp_one, range(n_samples), chunksize=8)):
+                nav_matrix[i] = vals
 
     pcts = np.nanpercentile(nav_matrix, [5, 25, 50, 75, 95], axis=0)
     return pd.DataFrame(
         {"p5": pcts[0], "p25": pcts[1], "p50": pcts[2], "p75": pcts[3], "p95": pcts[4]},
         index=sim_idx,
     )
+
+
+# ── parallel strategy-config grid (DSR trials, param grid, …) ────────────────
+# Each item is (label, strategy_kwargs); runs the full hedged strategy per config and
+# returns its daily NAV. Identical to serial (deterministic). Worker builds the feed +
+# preloads revenue once per process (in the initializer), reused across its configs.
+_PS: dict = {}
+
+
+def _ps_init(panel, volume_panel, rb, sim_idx, pool, data_dir, buy_bps, sell_bps):
+    from strategies.revenue_momentum import _preload_revenue
+    _preload_revenue(data_dir)
+    _PS.update(panel=panel, rb=rb, sim_idx=sim_idx, pool=pool, data=data_dir,
+               buy=buy_bps, sell=sell_bps, feed=VerifyFeed(list(panel.columns), panel, volume_panel))
+
+
+def _ps_one(item):
+    from strategies.revenue_momentum_hedged import RevenueMomentumHedgedStrategy
+    label, kwargs = item
+    feed, pool = _PS["feed"], _PS["pool"]
+    strat = RevenueMomentumHedgedStrategy(revenue_dir=_PS["data"], **kwargs)
+
+    def wf(date, cw, nav):
+        ts = pd.Timestamp(date)
+        feed.set_dynamic_universe(pool.get(ts, []))
+        pf = VerifyPortfolio(nav)
+        for s, w in cw.items():
+            pf.positions[s] = VerifyPosition(value=w * nav)
+        return strat.on_bar(VerifyContext(feed, pf, ts))
+
+    nav, stats = simulate_nav(_PS["panel"], _PS["rb"], wf, buy_cost_bps=_PS["buy"],
+                              sell_cost_bps=_PS["sell"], sim_idx=_PS["sim_idx"])
+    return label, (nav.values, float(stats["annual_turnover"]))
+
+
+def parallel_strategy_navs(panel, volume_panel, pool, rb, sim_idx, data_dir, items,
+                           buy_bps=17.0, sell_bps=47.0, n_workers=None):
+    """items: list of (label, strategy_kwargs). Returns {label: (nav np.array, annual_turnover)}, parallel."""
+    n_workers = min(n_workers or _default_workers(), max(1, len(items)))
+    out = {}
+    if n_workers <= 1:
+        _ps_init(panel, volume_panel, rb, sim_idx, pool, data_dir, buy_bps, sell_bps)
+        for it in items:
+            label, vals = _ps_one(it)
+            out[label] = vals
+    else:
+        with ProcessPoolExecutor(max_workers=n_workers, initializer=_ps_init,
+                                 initargs=(panel, volume_panel, rb, sim_idx, pool, data_dir, buy_bps, sell_bps)) as ex:
+            for label, vals in ex.map(_ps_one, items):
+                out[label] = vals
+    return out
 
 
 # ════════════════════════════════════════════════════════════════════════
@@ -517,6 +591,19 @@ def main():
                         help="Ranking factor (default accel = committed reference)")
     parser.add_argument("--max-holdings", type=int, default=15,
                         help="Holdings count; random-portfolio benchmark is matched to this")
+    parser.add_argument("--weight-method", default="signal",
+                        choices=["signal", "equal", "risk_parity"],
+                        help="Portfolio weighting (equal preferred for the new_high book)")
+    parser.add_argument("--min-streak", type=int, default=1,
+                        help="Require a new high sustained >= this many months (1 = off)")
+    parser.add_argument("--revenue-lag", type=int, default=15,
+                        help="Revenue lag in days; 15 = committed look-ahead floor")
+    parser.add_argument("--price-mom", default=None,
+                        help='2nd momentum leg for dual momentum, e.g. "nhigh" (price near 52w high)')
+    parser.add_argument("--intersect-pct", type=float, default=None,
+                        help="dual-momentum: hold names in top-pct of BOTH revenue & price")
+    parser.add_argument("--no-accel-gate", action="store_true",
+                        help="disable the revenue-acceleration gate (used for the dual-momentum book)")
     args = parser.parse_args()
 
     out_dir = Path(args.out)
@@ -524,9 +611,6 @@ def main():
     (out_dir / "benchmarks").mkdir(exist_ok=True)
     data = ParquetDataSource(Path(args.data_dir))
 
-    logger.info("=" * 60)
-    logger.info("Building universe %s ~ %s", args.start, args.end)
-    logger.info("=" * 60)
     universe, panel, volume_panel, _revenue, first_listed = build_universe(data, args.start, args.end)
     feed = VerifyFeed(universe, panel, volume_panel)
 
@@ -537,14 +621,10 @@ def main():
     end_ts = pd.Timestamp(args.end)
     sim_idx = panel.index[(panel.index >= start_ts) & (panel.index <= end_ts)]
     rebalance_dates = get_rebalance_dates(sim_idx)
-    logger.info("Sim window: %s ~ %s (%d trading days, %d rebalances)",
-                sim_idx[0].date(), sim_idx[-1].date(), len(sim_idx), len(rebalance_dates))
 
     # Pre-compute eligible pool (shared across strategies + random)
     pool_cache = {d: eligible_at(d, panel, volume_panel, first_listed) for d in rebalance_dates}
     pool_sizes = [len(pool_cache[d]) for d in rebalance_dates]
-    logger.info("Point-in-time pool: min=%d, median=%d, max=%d (vs static %d)",
-                min(pool_sizes), int(np.median(pool_sizes)), max(pool_sizes), len(universe))
 
     # Import real strategy classes
     from strategies.revenue_momentum import RevenueMomentumStrategy
@@ -563,24 +643,25 @@ def main():
         return weight_fn
 
     def run_at_cost(buy_bps: float, sell_bps: float, suffix: str) -> dict:
-        logger.info("--- Run @ buy=%.0f sell=%.0f bps (%s) ---", buy_bps, sell_bps, suffix)
 
-        rev_strategy = (RevenueMomentumStrategy(revenue_dir=args.data_dir,
-                                                ranking=args.ranking, max_holdings=args.max_holdings)
+        strat_kwargs = dict(revenue_dir=args.data_dir, ranking=args.ranking,
+                            max_holdings=args.max_holdings,
+                            weight_method=args.weight_method, min_newhigh_streak=args.min_streak,
+                            revenue_lag_days=args.revenue_lag,
+                            price_mom_factor=args.price_mom, intersect_pct=args.intersect_pct,
+                            use_accel_gate=(not args.no_accel_gate))
+        rev_strategy = (RevenueMomentumStrategy(**strat_kwargs)
                         if args.no_regime
-                        else RevenueMomentumHedgedStrategy(revenue_dir=args.data_dir,
-                                                           ranking=args.ranking, max_holdings=args.max_holdings))
+                        else RevenueMomentumHedgedStrategy(**strat_kwargs))
         strategy_nav, strat_stats = simulate_nav(
             panel, rebalance_dates, make_strategy_weight_fn(rev_strategy),
             buy_cost_bps=buy_bps, sell_cost_bps=sell_bps, sim_idx=sim_idx)
-        logger.info("Revenue Mom (%s) turnover: %.2f /yr", rev_strategy.name(), strat_stats["annual_turnover"])
         _save_nav(strategy_nav, out_dir / f"strategy_nav_{suffix}.csv")
 
         mom_strategy = MomentumStrategy(max_holdings=15)
         momentum_nav, mom_stats = simulate_nav(
             panel, rebalance_dates, make_strategy_weight_fn(mom_strategy),
             buy_cost_bps=buy_bps, sell_cost_bps=sell_bps, sim_idx=sim_idx)
-        logger.info("Price Mom 12-1 turnover: %.2f /yr", mom_stats["annual_turnover"])
         _save_nav(momentum_nav, out_dir / f"momentum_12_1_nav_{suffix}.csv")
 
         # Diversified passive: top 50 by liquidity, equal-weight monthly
@@ -589,7 +670,6 @@ def main():
             n_holdings=50, buy_bps=buy_bps, sell_bps=sell_bps,
         )
         _save_nav(top50_nav, out_dir / f"benchmarks/top50_eq_weight_{suffix}.csv")
-        logger.info("Top 50 EW: CAGR=%.2f%%", compute_metrics(top50_nav).get("cagr", 0) * 100)
 
         rp = random_portfolios_nav(panel, volume_panel, first_listed, rebalance_dates, sim_idx,
                                    n_samples=args.random_samples, n_holdings=args.max_holdings,

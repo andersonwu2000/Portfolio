@@ -16,14 +16,11 @@ Open issue: bear/sideways both scale to 30%, very binary.
 
 from __future__ import annotations
 
-import logging
 
 import numpy as np
 
 from .base import Context, Strategy
 from .registry import resolve_strategy
-
-logger = logging.getLogger(__name__)
 
 
 class RevenueMomentumHedgedStrategy(Strategy):

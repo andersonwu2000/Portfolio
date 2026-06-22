@@ -5,23 +5,39 @@ Adapted from the production strategy:
 - Replaced src.data.registry lookup with a configurable `revenue_dir` parameter
 - Removed event-driven rebalancer code path (use monthly rebalance only)
 
-Core ranking factor: revenue_acceleration = mean(rev[-3:]) / mean(rev[-12:])
-- ICIR 0.476 (acceleration)  vs  0.188 (raw YoY) — after 40-day publication lag.
+Architecture (separation of concerns):
+  Universe (feasibility, in verify_strategy.eligible_at):
+      alive + >=90-day history + base liquidity.
+  Universal screens (factor-agnostic hygiene, applied here):
+      - Liquidity:     20-day avg volume >= min_volume_lots (default 300 lots).
+      - Minimum price: close >= min_price (default NT$10; penny / microstructure-noise floor).
+  Signal (revenue momentum, factor-specific):
+      - Acceleration condition: rev_3m_avg > rev_12m_avg (use_accel_gate).
+      - Persistence: require a new 12-month high sustained for >= min_newhigh_streak
+        months (denoise one-off spikes; 1 = off).
+      - Rank by `ranking` (accel | new_high | ensemble); take top `max_holdings`.
+      - new_high winsorized at `newhigh_cap` (bound base-effect artifacts, e.g. revenue
+        off a near-zero base producing an implausible ratio).
+  Portfolio: weights by `weight_method`; equal-weight is preferred for the new_high book
+      (its rank-IC validates ordering, not cardinal magnitude, so signal-proportional
+      weights just add single-name risk from low-base spikes). Per-name cap, 5% cash buffer.
+  Market-risk: handled by the revenue_momentum_hedged wrapper (scale down in bear/sideways).
 
-Selection screens (5 layers):
-  1. Liquidity:           20-day avg volume >= 300 lots (300,000 shares)
-  2. Trend confirmation:  close > 60-day MA
-  3. Momentum:            60-day return > 0
-  4. Revenue acceleration: rev_3m_avg > rev_12m_avg
-  5. Growth threshold:    latest YoY revenue growth >= min_yoy_growth (default 10%)
+Design note: earlier versions also screened on price trend (close > 60d MA), price
+momentum (60d return > 0) and a YoY>=10% growth gate. A screen-by-screen ablation
+showed the price screens add ~0 Sharpe (a price-momentum confound on a revenue thesis)
+and the YoY gate hurt; all three are off by default. See Analysis/ for the ablation.
 
-Revenue lag:  +40 days (TW monthly revenue is published by the 10th of the next month).
+Revenue lag:  +15 days (committed). Data labels revenue by publication month (revenue of
+              month M -> date (M+1)-01, public by the 10th), so ~15 days is the look-ahead
+              floor. A longer lag improves the in-sample backtest but is a discretionary,
+              isolated spike (~lag 40 x streak-2) that fails OOS / multiple-testing scrutiny,
+              so the report uses 15 (the principled floor).
 Rebalance:    monthly, on first on_bar of each calendar month.
 """
 
 from __future__ import annotations
 
-import logging
 import time as _time
 from pathlib import Path
 from typing import Any
@@ -32,10 +48,12 @@ import pandas as pd
 from .base import Context, Strategy
 from .optimizer import OptConstraints, equal_weight, risk_parity, signal_weight
 
-logger = logging.getLogger(__name__)
 
 # ── Revenue cache (module-level so multiple instances share it) ─────────
 _revenue_cache: dict[str, pd.DataFrame] | None = None
+# Parallel numpy cache for the hot path: sym -> (dates[datetime64ns], revenue[f64], yoy[f64]).
+# `_get_revenue_at` uses searchsorted on these instead of pandas boolean indexing (~10-50x faster).
+_revenue_np_cache: dict[str, tuple] = {}
 _revenue_cache_time: float = 0.0
 _REVENUE_CACHE_TTL = 3600 * 6  # 6 hours
 
@@ -46,15 +64,16 @@ def _preload_revenue(revenue_dir: str = "data") -> dict[str, pd.DataFrame]:
     Files expected: {revenue_dir}/{symbol}_revenue.parquet
     Each file must have columns: date, revenue (yoy_growth optional — recomputed if missing).
     """
-    global _revenue_cache, _revenue_cache_time
+    global _revenue_cache, _revenue_cache_time, _revenue_np_cache
     if _revenue_cache is not None and (_time.time() - _revenue_cache_time) < _REVENUE_CACHE_TTL:
         return _revenue_cache
 
     cache: dict[str, pd.DataFrame] = {}
+    np_cache: dict[str, tuple] = {}
     revenue_path = Path(revenue_dir)
     if not revenue_path.exists():
-        logger.warning("Revenue dir not found: %s", revenue_path.resolve())
         _revenue_cache = cache
+        _revenue_np_cache = np_cache
         _revenue_cache_time = _time.time()
         return cache
 
@@ -75,50 +94,90 @@ def _preload_revenue(revenue_dir: str = "data") -> dict[str, pd.DataFrame]:
                 df["yoy_growth"] = ((df["revenue"] / prev_year_rev) - 1) * 100
 
             cache[sym] = df
+            np_cache[sym] = (df["date"].values,
+                             df["revenue"].to_numpy(dtype=float),
+                             df["yoy_growth"].to_numpy(dtype=float))
         except Exception:
             continue
 
-    logger.info("Preloaded revenue data: %d symbols from %s", len(cache), revenue_path)
     _revenue_cache = cache
+    _revenue_np_cache = np_cache
     _revenue_cache_time = _time.time()
     return cache
+
+
+def _newhigh_streak(revenues: np.ndarray, max_check: int = 12) -> int:
+    """Consecutive most-recent months whose revenue set a strict 12-month high.
+
+    A single-month new high is often a one-off (bulk order / channel stuffing);
+    requiring the high to persist for several months denoises the signal. Counts
+    backwards from the latest month: month at position p is a new high iff
+    rev[p] > max(rev[p-11 : p]); stops at the first month that is not.
+    """
+    r = np.asarray(revenues, dtype=float)
+    p = len(r) - 1
+    streak = 0
+    for j in range(max_check):
+        pos = p - j
+        if pos - 11 < 0:
+            break
+        prior_max = float(np.max(r[pos - 11:pos]))
+        if prior_max > 0 and r[pos] > prior_max:
+            streak += 1
+        else:
+            break
+    return streak
 
 
 def _get_revenue_at(
     cache: dict[str, pd.DataFrame],
     symbol: str,
     as_of: pd.Timestamp,
-) -> tuple[float, float, float, float] | None:
-    """Return (rev_3m_avg, rev_12m_avg, latest_yoy, new_high) as of `as_of`-40d, or None.
+    lag_days: int = 15,
+) -> tuple[float, float, float, float, int] | None:
+    """Return (rev_3m_avg, rev_12m_avg, latest_yoy, new_high, nh_streak) as of
+    `as_of` - lag_days (default 15; see below), or None.
 
     new_high = rev[-1] / max(rev[-12:-1]) — latest revenue vs prior 11-month peak
     (the canonical revenue new-high factor; >1 means a new high).
+    nh_streak = consecutive months ending now that set a strict 12-month high
+    (persistence gate input; see `_newhigh_streak`).
 
-    The 40-day lag prevents look-ahead: TW monthly revenue for month M is
-    published by Mth+10, so on date d we should only use data dated <= d - 40.
+    `lag_days`: the data labels revenue of month M as date (M+1)-01 (public by the
+    10th), so ~15 days is the look-ahead floor (default; committed). A longer lag
+    improves the in-sample backtest but is an isolated, discretionary spike (~lag 40
+    x streak-2) that does not clear OOS / multiple-testing scrutiny — not used.
     """
-    df = cache.get(symbol)
-    if df is None:
-        return None
+    arr = _revenue_np_cache.get(symbol)
+    if arr is None:
+        # fallback for callers with a custom df cache not preloaded via _preload_revenue
+        df = cache.get(symbol)
+        if df is None or "revenue" not in df.columns or "yoy_growth" not in df.columns:
+            return None
+        arr = (df["date"].values, df["revenue"].to_numpy(dtype=float),
+               df["yoy_growth"].to_numpy(dtype=float))
+        _revenue_np_cache[symbol] = arr
+    dates, rev, yoy = arr
 
     as_of_naive = as_of.tz_localize(None) if as_of.tzinfo is not None else as_of
-    usable_cutoff = as_of_naive - pd.DateOffset(days=40)
-    mask = df["date"] <= usable_cutoff
-    available = df[mask]
-    if len(available) < 12:
+    cutoff = (as_of_naive - pd.Timedelta(days=lag_days)).to_datetime64()
+    idx = int(np.searchsorted(dates, cutoff, side="right"))   # rows [0:idx] have date <= cutoff
+    if idx < 12:
         return None
 
-    revenues = available["revenue"].values
-    rev_3m = float(np.mean(np.asarray(revenues[-3:]))) if len(revenues) >= 3 else 0
-    rev_12m = float(np.mean(np.asarray(revenues[-12:]))) if len(revenues) >= 12 else 0
-
-    past_max = float(np.max(np.asarray(revenues[-12:-1]))) if len(revenues) >= 12 else 0.0
+    revenues = rev[:idx]
+    rev_3m = float(revenues[-3:].mean())
+    rev_12m = float(revenues[-12:].mean())
+    past_max = float(revenues[-12:-1].max())
     new_high = (float(revenues[-1]) / past_max) if past_max > 0 else 0.0
 
-    yoy_vals = available["yoy_growth"].dropna().values
-    latest_yoy = float(yoy_vals[-1]) if len(yoy_vals) > 0 else 0
+    yv = yoy[:idx]
+    fin = yv[np.isfinite(yv)]
+    latest_yoy = float(fin[-1]) if fin.size else 0.0
 
-    return (rev_3m, rev_12m, latest_yoy, new_high)
+    nh_streak = _newhigh_streak(revenues)
+
+    return (rev_3m, rev_12m, latest_yoy, new_high, nh_streak)
 
 
 class RevenueMomentumStrategy(Strategy):
@@ -133,8 +192,17 @@ class RevenueMomentumStrategy(Strategy):
         max_holdings: int = 15,
         ranking: str = "accel",         # "accel" | "new_high" | "ensemble" (rank-avg of both)
         exit_rank: int | None = None,   # hysteresis: hold a name until its rank > exit_rank (None = no buffer)
-        min_yoy_growth: float = 10.0,
-        min_volume_lots: int = 300,
+        min_yoy_growth: float | None = None,  # signal gate (off by default): require latest YoY >= this
+        min_volume_lots: int = 300,           # universal screen: liquidity floor
+        min_price: float = 10.0,              # universal screen: min close price (penny / microstructure floor)
+        use_ma_screen: bool = False,     # legacy price-trend screen (close > 60d MA); ablation: ~0 alpha, confound
+        use_return_screen: bool = False, # legacy price-momentum screen (60d return > 0); ablation: hurts
+        use_accel_gate: bool = True,     # signal: rev_3m > rev_12m (revenue acceleration condition)
+        min_newhigh_streak: int = 1,     # signal: require a new high sustained >= this many months (1 = off)
+        revenue_lag_days: int = 15,      # publication look-ahead floor (committed); longer is a discretionary in-sample choice
+        newhigh_cap: float | None = 20.0,  # signal hygiene: winsorize new_high at a high cap (bound base-effect artifacts)
+        price_mom_factor: str | None = None,  # 2nd momentum leg: None | "nhigh" (price near 52-week high)
+        intersect_pct: float | None = None,   # dual-momentum: hold names in top-pct of BOTH revenue & price (None = off)
         max_weight: float = 0.10,
         weight_method: str = "signal",        # "equal" | "signal" | "risk_parity"
         enable_regime_hedge: bool = False,    # use the _hedged wrapper instead
@@ -148,6 +216,15 @@ class RevenueMomentumStrategy(Strategy):
         self.exit_rank = exit_rank
         self.min_yoy_growth = min_yoy_growth
         self.min_volume_lots = min_volume_lots
+        self.min_price = min_price
+        self.use_ma_screen = use_ma_screen
+        self.use_return_screen = use_return_screen
+        self.use_accel_gate = use_accel_gate
+        self.min_newhigh_streak = min_newhigh_streak
+        self.revenue_lag_days = revenue_lag_days
+        self.newhigh_cap = newhigh_cap
+        self.price_mom_factor = price_mom_factor
+        self.intersect_pct = intersect_pct
         self.max_weight = max_weight
         self.weight_method = weight_method
         self.enable_regime_hedge = enable_regime_hedge
@@ -214,34 +291,46 @@ class RevenueMomentumStrategy(Strategy):
                 if avg_vol_20 < self.min_volume_lots * 1000:
                     continue
 
-                # 3: price > 60-day MA
+                # universal screen: minimum price (penny-stock / microstructure-noise floor)
+                if self.min_price > 0 and float(close.iloc[-1]) < self.min_price:
+                    continue
+
+                # data sufficiency for the 60-day price screens
                 if len(close) < 60:
                     continue
-                ma60 = float(close.iloc[-60:].mean())
-                if float(close.iloc[-1]) <= ma60:
+                # screen ②: price > 60-day MA (trend confirmation)
+                if self.use_ma_screen and float(close.iloc[-1]) <= float(close.iloc[-60:].mean()):
+                    continue
+                # screen ③: 60-day return > 0 (price momentum)
+                if self.use_return_screen and float(close.iloc[-1]) / float(close.iloc[-60]) - 1 <= 0:
                     continue
 
-                # 4: 60-day return > 0
-                if float(close.iloc[-1]) / float(close.iloc[-60]) - 1 <= 0:
-                    continue
-
-                # 1 & 2: revenue
-                rev_data = _get_revenue_at(self._rev_cache, symbol, as_of)
+                # revenue factors (publication+confirmation lag handled inside)
+                rev_data = _get_revenue_at(self._rev_cache, symbol, as_of, self.revenue_lag_days)
                 if rev_data is None:
                     continue
 
-                rev_3m, rev_12m, latest_yoy, new_high = rev_data
-                if rev_12m <= 0 or rev_3m <= rev_12m:
+                rev_3m, rev_12m, latest_yoy, new_high, nh_streak = rev_data
+                if rev_12m <= 0:
                     continue
-                if latest_yoy < self.min_yoy_growth:
+                # screen ④: revenue acceleration (rev_3m > rev_12m)
+                if self.use_accel_gate and rev_3m <= rev_12m:
+                    continue
+                # signal: require a new high sustained for >= min_newhigh_streak months
+                # (denoise one-off spikes; 1 = off). See _newhigh_streak.
+                if self.min_newhigh_streak > 1 and nh_streak < self.min_newhigh_streak:
+                    continue
+                # optional signal gate: latest YoY growth >= threshold (off by default)
+                if self.min_yoy_growth is not None and latest_yoy < self.min_yoy_growth:
                     continue
 
                 # Carry both ranking factors; the active one is chosen below.
                 acceleration = rev_3m / rev_12m
-                candidates.append((symbol, acceleration, new_high))
+                # price near-52-week-high (dual-momentum 2nd leg): close / trailing max (no look-ahead)
+                near_high = float(close.iloc[-1]) / float(close.max()) if float(close.max()) > 0 else 0.0
+                candidates.append((symbol, acceleration, new_high, near_high))
 
             except Exception as e:
-                logger.debug("Skip %s: %s", symbol, e)
                 continue
 
         if not candidates:
@@ -253,6 +342,9 @@ class RevenueMomentumStrategy(Strategy):
         syms = [c[0] for c in candidates]
         acc = np.array([c[1] for c in candidates], dtype=float)
         nh = np.array([c[2] for c in candidates], dtype=float)
+        ph = np.array([c[3] for c in candidates], dtype=float)   # price near-52w-high (dual-momentum leg)
+        if self.newhigh_cap is not None:
+            nh = np.minimum(nh, self.newhigh_cap)   # winsorize: low-base spikes get a real-momentum weight, not a 1000x one
         if self.ranking == "new_high":
             score = nh
         elif self.ranking == "ensemble":
@@ -264,11 +356,23 @@ class RevenueMomentumStrategy(Strategy):
         score_of = {syms[i]: float(score[i]) for i in range(len(syms))}
         ranked_syms = [syms[i] for i in np.argsort(score)[::-1]]  # high -> low
 
+        # Dual momentum (intersection): hold names in the top-`intersect_pct` of BOTH the
+        # revenue ranking AND price near-52w-high, capped at max_holdings by revenue rank.
+        # (FinLab 雙渦輪-style: revenue breakout INTERSECT price breakout. Off by default.)
+        if self.intersect_pct is not None and self.price_mom_factor == "nhigh":
+            n = len(ranked_syms)
+            mom_pct = {s: i / max(n - 1, 1) for i, s in enumerate(ranked_syms)}
+            price_ranked = [syms[i] for i in np.argsort(ph)[::-1]]   # high near-high first
+            np_ = len(price_ranked)
+            price_pct = {s: i / max(np_ - 1, 1) for i, s in enumerate(price_ranked)}
+            p = self.intersect_pct
+            selected_syms = [s for s in ranked_syms
+                             if mom_pct[s] <= p and price_pct.get(s, 1.1) <= p][: self.max_holdings]
         # Selection hysteresis (buffering): when exit_rank is set, keep currently
         # held names that still rank within [0, exit_rank) before filling the rest
         # from the top. Suppresses turnover from names oscillating around the
         # rank-`max_holdings` boundary without touching the entry bar.
-        if self.exit_rank is not None and self.exit_rank > self.max_holdings:
+        elif self.exit_rank is not None and self.exit_rank > self.max_holdings:
             rank_of = {s: i for i, s in enumerate(ranked_syms)}
             portfolio = ctx.portfolio()
             held: list[str] = []
