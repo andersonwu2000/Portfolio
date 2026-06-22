@@ -1,6 +1,11 @@
 # Report — 成果與圖表
 
-本目錄是給讀者看的成品：研究的圖表，以及（日後補上的）研究報告。
+本目錄是給讀者看的成品：研究報告與其圖表。
+
+## 研究報告
+
+- `report.ipynb` — 完整研究報告（混合型 notebook）。敘事、表格、公式齊備；其中投資池、IC、創新高 50 檔回測、DSR/CAPM 由 `../Backtest/` 的引擎即時重現並嵌入輸出，其餘圖表以相對路徑引用本目錄 `figures/`。在 `Report/` 下 `jupyter notebook` 或 `Run All` 即可重跑。
+- `_build_report.py` — 產生 `report.ipynb` 的腳本（與 `Analysis/visualization/` 的繪圖腳本同精神：成品可由程式重現）。要重建：`python _build_report.py` 後 `python -m nbconvert --to notebook --execute --inplace report.ipynb`。
 
 ## 圖表
 
