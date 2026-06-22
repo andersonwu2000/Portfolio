@@ -2,3 +2,8 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 .DS_Store
+
+# Report notebook 產生器：保留本機可重現，不入版控（交付以 report.ipynb 為準）
+Quant/FINAL/Report/_build_report.py
+# 回測快取（grid / benchmark navs，可由 report.ipynb 重新生成）
+Quant/FINAL/Report/_cache/
